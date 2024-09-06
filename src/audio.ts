@@ -17,7 +17,6 @@ const sessionEvents = [
 type EventIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 
 export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
-  private codecs: Codecs
   private ctx: AudioContext | undefined
   private sourceNode: MediaElementAudioSourceNode | undefined
   private gainNode: GainNode | undefined
@@ -26,6 +25,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
   protected isEnding = false
   protected options: Required<Omit<ZAudioOptions, 'mediaSession'>>
   protected ses: MediaSession | undefined
+  public codecs: Codecs
   public audio = new Audio()
   public state: LoadingState = 'empty'
   public constructor(options: ZAudioOptions = {}) {
