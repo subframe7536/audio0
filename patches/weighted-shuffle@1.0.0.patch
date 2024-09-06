@@ -1,0 +1,16 @@
+diff --git a/CHANGELOG b/CHANGELOG
+deleted file mode 100644
+index c7385c5e15d5a0f2dcce060ad06658a219852468..0000000000000000000000000000000000000000
+diff --git a/lib/index.js b/lib/index.js
+index 338bd55fc738fefd9d887e79155698f6a3f08a4d..c41d3e719097bf671e8396233b72e5131b8f44be 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -8,7 +8,7 @@ var Direction;
+     Direction["desc"] = "desc";
+ })(Direction = exports.Direction || (exports.Direction = {}));
+ function shuffle(input, direction) {
+-    if (direction === void 0) { direction = Direction.asc; }
++    if (direction === void 0) { direction = Direction.desc; }
+     var tuples = Array.isArray(input)
+         ? util_1.fromArray(input)
+         : util_1.fromObject(input);

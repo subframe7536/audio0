@@ -1,0 +1,12 @@
+{
+  "extends": "@subframe7536/type-utils/tsconfig.json",
+  "compilerOptions": {
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
+    "types": [
+      "vite/client"
+    ]
+  }
+}
