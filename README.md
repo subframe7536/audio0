@@ -37,6 +37,49 @@ await audio.play()
 
 ```ts
 import { ZPlayer } from 'audio0'
+import ogg from './test.ogg?url'
+import mp3 from './test.mp3?url'
+
+const player = new ZPlayer({
+  trackList: [{ src: ogg }, { src: mp3 }],
+  autoNext: true,
+})
+
+player.on('timeupdate', (time) => {
+  player.handleContext(ctx => console.log(time, ctx.currentTime, player.duration))
+})
+
+player.on('error', console.error)
+player.on('reorder', () => console.log('reorder'))
+
+prevButton.addEventListener('click', () => {
+  player.prevTrack()
+})
+nextButton.addEventListener('click', () => {
+  player.nextTrack()
+})
+```
+
+### Utils
+
+```ts
+/**
+ * Parse audio buffer to array, use for generate audio waveform
+ * @param buf source audio buffer
+ * @param blockNum result block amount
+ * @param max max value (0 ~ 1), default 0.9
+ * @param min min value (0 ~ 1), default 0.1
+ */
+function normalizeAudioBuffer(buf: AudioBuffer, blockNum?: number, max?: number, min?: number): number[]
+/**
+ * Create shuffle function that weighted shuffle by artist and score
+ * @param getLimit get limit function. The larger of result, the more shuffled, the poor performance, @default n => n * 2 / 3
+ */
+function createWeightedArtistShuffle(getLimit?: GetLimitFn): ShuffleIndexFn
+function bindEventListenerWithCleanup(el: EventTarget, type: string, handler: EventListener): VoidFunction
+function secondToTime(second: number): string
+function formatVolume(val: number): number
+function clamp(min: number, val: number, max: number): number
 ```
 
 ## Credit

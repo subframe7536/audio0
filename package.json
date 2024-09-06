@@ -2,7 +2,7 @@
   "name": "audio0",
   "type": "module",
   "version": "0.0.1",
-  "description": "Audio library for the modern browser",
+  "description": "Audio library for the modern browser, auto cross fade",
   "author": "subframe7536",
   "license": "MIT",
   "repository": {
