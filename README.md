@@ -71,14 +71,30 @@ nextButton.addEventListener('click', () => {
  * @param min min value (0 ~ 1), default 0.1
  */
 function normalizeAudioBuffer(buf: AudioBuffer, blockNum?: number, max?: number, min?: number): number[]
+
 /**
  * Create shuffle function that weighted shuffle by artist and score
  * @param getLimit get limit function. The larger of result, the more shuffled, the poor performance, @default n => n * 2 / 3
  */
 function createWeightedArtistShuffle(getLimit?: GetLimitFn): ShuffleIndexFn
+
+/**
+ * Create equalizer
+ * @param ctx audioContext
+ * @param freq frequency array, you can use {@link defaultFreq}
+ * @param handleNode biquad filter node handler
+ * @example
+ * const eq = createEqualizer(ctx, defaultFeq)
+ * const eq1 = createEqualizer(ctx, [100, 200, 300, 400, 500] as const)
+ */
+function createEqualizer<T extends readonly number[]>(ctx: AudioContext, freq: T, handleNode?: (band: BiquadFilterNode, freq: T[number], index: number) => void): EQ<T>
+
 function bindEventListenerWithCleanup(el: EventTarget, type: string, handler: EventListener): VoidFunction
+
 function secondToTime(second: number): string
+
 function formatVolume(val: number): number
+
 function clamp(min: number, val: number, max: number): number
 ```
 

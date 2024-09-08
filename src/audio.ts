@@ -221,7 +221,10 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
       this.gainNode.gain.setValueAtTime(this.volume, this.ctx.currentTime)
       this.sourceNode = this.ctx.createMediaElementSource(this.audio)
       this.gainNode.connect(this.ctx.destination)
-      this.handleContext(ctx => this.options.extraAudioNodes(ctx))
+      this.handleContext((ctx) => {
+        const nodes = this.options.extraAudioNodes(ctx)
+        return Array.isArray(nodes) ? nodes : nodes()
+      })
       this.setVolume(this.volume)
     }
     await this.ctx?.suspend()

@@ -59,7 +59,7 @@ export type ZAudioOptions = {
    *
    * @param ctx audio context
    */
-  extraAudioNodes?: (ctx: AudioContext) => AudioNode[]
+  extraAudioNodes?: (ctx: AudioContext) => AudioNode[] | (() => AudioNode[])
 }
 
 export type ZPlayerOptions = ZAudioOptions & {
