@@ -1,6 +1,6 @@
-import type { LoadOptions, LoopMode, ShuffleFn, Track, ZPlayerEvents, ZPlayerOptions } from './types'
 import { ZAudio } from './audio'
 import { defaultShuffle } from './utils/shuffle'
+import type { LoadOptions, LoopMode, ShuffleFn, Track, ZPlayerEvents, ZPlayerOptions } from './types'
 
 export class ZPlayer extends ZAudio<ZPlayerEvents> {
   private currentIndex = 0

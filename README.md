@@ -37,8 +37,8 @@ await audio.play()
 
 ```ts
 import { ZPlayer } from 'audio0'
-import ogg from './test.ogg?url'
 import mp3 from './test.mp3?url'
+import ogg from './test.ogg?url'
 
 const player = new ZPlayer({
   trackList: [{ src: ogg }, { src: mp3 }],

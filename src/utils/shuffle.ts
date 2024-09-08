@@ -1,6 +1,6 @@
 import { shuffle as weightedShuffle } from 'weighted-shuffle'
-import type { Track } from '../types'
 import { clamp } from './common'
+import type { Track } from '../types'
 
 export type ShuffleIndexFn = (songs: Track[]) => number[]
 

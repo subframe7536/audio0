@@ -1,8 +1,8 @@
 import { ZPlayer } from '../src'
 // import { createWeightedArtistShuffle, defaultShuffle } from '../src/utils/shuffle'
 import { normalizeAudioBuffer } from '../src/utils/buffer'
-import ogg from './test.ogg?url'
 import mp3 from './test.mp3?url'
+import ogg from './test.ogg?url'
 
 const loadButton = document.querySelector('.load')!
 const playButton = document.querySelector('.btn')!

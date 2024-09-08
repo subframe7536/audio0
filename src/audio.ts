@@ -1,7 +1,7 @@
-import { Mitt } from 'zen-mitt'
+import { Mitt } from 'zen-mitt/class'
 import type { Promisable } from '@subframe7536/type-utils'
+import { type Codecs, type LoadingState, type LoadOptions, type Track, ZAudioError, type ZAudioErrorCode, type ZAudioEvents, type ZAudioOptions } from './types'
 import { bindEventListenerWithCleanup, clamp, formatVolume, getCodecs, sleep } from './utils'
-import { type Codecs, type LoadOptions, type LoadingState, type Track, ZAudioError, type ZAudioErrorCode, type ZAudioEvents, type ZAudioOptions } from './types'
 
 /// keep-sorted
 const sessionEvents = [

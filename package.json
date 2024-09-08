@@ -41,9 +41,9 @@
     "zen-mitt": "^3.0.0"
   },
   "devDependencies": {
-    "@subframe7536/eslint-config": "^0.9.0",
+    "@subframe7536/eslint-config": "^0.9.1",
     "bumpp": "^9.5.2",
-    "eslint": "^9.9.1",
+    "eslint": "^9.10.0",
     "tsup": "^8.2.4",
     "typescript": "^5.5.4",
     "vite": "^5.4.3",
