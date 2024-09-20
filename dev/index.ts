@@ -8,6 +8,8 @@ const loadButton = document.querySelector('.load')!
 const playButton = document.querySelector('.btn')!
 const prevButton = document.querySelector('.prev')!
 const nextButton = document.querySelector('.next')!
+const forwardButton = document.querySelector('.forward')!
+const backwardButton = document.querySelector('.backward')!
 
 const player = new ZPlayer({
   trackList: [{ src: ogg }, { src: mp3 }],
@@ -52,6 +54,12 @@ prevButton.addEventListener('click', () => {
 })
 nextButton.addEventListener('click', () => {
   player.nextTrack()
+})
+forwardButton.addEventListener('click', () => {
+  player.seek(player.currentTime + 10)
+})
+backwardButton.addEventListener('click', () => {
+  player.seek(player.currentTime - 10)
 })
 
 // const arr: { title: string, artist: string, album: string }[] = [

@@ -168,13 +168,14 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     ) => Promisable<AudioNode[] | undefined | void | null>,
   ): Promisable<void> {
     const conn = (nodes: AudioNode[] | undefined | void | null): void => {
-      const len = nodes?.length
-      if (!len) {
-        return
-      }
       this.sourceNode!.disconnect()
       for (let i = 0; i < this.nodes.length; i++) {
         this.nodes[i].disconnect()
+      }
+      const len = nodes?.length
+      if (!len) {
+        this.sourceNode!.connect(this.gainNode!)
+        return
       }
       this.sourceNode!.connect(nodes[0])
       for (let i = 0; i < len - 1; i++) {
@@ -227,7 +228,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
       })
       this.setVolume(this.volume)
     }
-    await this.ctx?.suspend()
+    await this.ctx.suspend()
 
     this.state = 'loading'
     this.isEnding = false

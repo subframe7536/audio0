@@ -46,5 +46,5 @@ export function createEqualizer<T extends readonly number[]>(
   }
 }
 
-const eq = createEqualizer(new AudioContext(), defaultFreq)
-eq.handle(1000, band => (band.gain.value = 0))
+// const eq = createEqualizer(new AudioContext(), defaultFreq)
+// eq.handle(1000, band => (band.gain.value = 0))
