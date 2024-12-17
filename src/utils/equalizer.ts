@@ -40,7 +40,7 @@ export function createEqualizer<T extends readonly number[]>(
 
   return {
     nodes: () => result,
-    handle(targetFreq: T[number], fn: (band: BiquadFilterNode) => void) {
+    handle: (targetFreq: T[number], fn: (band: BiquadFilterNode) => void) => {
       fn(result[freq.indexOf(targetFreq)])
     },
   }
