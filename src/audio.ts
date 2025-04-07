@@ -292,7 +292,8 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
       return false
     }
     try {
-      if (this.ctx.state === 'suspended') {
+      // @ts-expect-error https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/state#resuming_interrupted_play_states_in_ios_safari
+      if (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted') {
         await this.ctx.resume()
       }
       this.isEnding = false
