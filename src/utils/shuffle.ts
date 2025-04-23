@@ -1,10 +1,12 @@
-import type { Track } from '../types'
+import type { TrackInfo } from '../types'
+
 import { shuffle as weightedShuffle } from 'weighted-shuffle'
+
 import { clamp } from './common'
 
-export type ShuffleIndexFn = (songs: Track[]) => number[]
+export type ShuffleIndexFn = (songs: TrackInfo[]) => number[]
 
-export const defaultShuffle: ShuffleIndexFn = (array: Track[]) => {
+export const defaultShuffle: ShuffleIndexFn = (array: TrackInfo[]) => {
   const arr = Array.from({ length: array.length }, (_, i) => i)
   shuffleFn(arr)
   return arr
@@ -32,7 +34,7 @@ type GetLimitFn = (totalArtists: number) => number
 export function createWeightedArtistShuffle(
   getLimit: GetLimitFn = n => n * 2 / 3,
 ): ShuffleIndexFn {
-  return (songs: Track[]) => {
+  return (songs: TrackInfo[]) => {
     const artistMap = new Map<string, [number, number][]>()
     for (let i = 0; i < songs.length; i++) {
       const artist = songs[i].artist || 'unknown'

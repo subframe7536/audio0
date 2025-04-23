@@ -37,6 +37,7 @@ await audio.play()
 
 ```ts
 import { ZPlayer } from 'audio0'
+
 import mp3 from './test.mp3?url'
 import ogg from './test.ogg?url'
 

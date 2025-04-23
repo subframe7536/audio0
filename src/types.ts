@@ -1,4 +1,4 @@
-import type { Prettify } from '@subframe7536/type-utils'
+import type { Promisable } from '@subframe7536/type-utils'
 
 /**
  * Audio error code
@@ -18,19 +18,30 @@ export class ZAudioError extends Error {
 }
 
 export type LoopMode = 'random' | 'list' | 'single'
-export type Track = Prettify<MediaMetadataInit & {
-  src: string
+
+export interface TrackInfo extends MediaMetadataInit {
   score?: number
-}>
+}
+
+export interface Track extends TrackInfo {
+  src: string
+}
+
+export interface StreamTrack extends TrackInfo {
+  src: () => Promisable<ReadableStream>
+  mimeType: string
+}
+
 /**
  * Shuffle an array
  * @param arr list of id and weight
  * @returns list of id
  */
-export type ShuffleFn = (trackList: Track[]) => number[]
+export type ShuffleFn = (trackList: TrackInfo[]) => number[]
 
 export type Codecs = Set<string>
-export type ZAudioOptions = {
+
+export interface ZAudioOptions {
   /**
    * Fade duration
    * @default 500
@@ -115,6 +126,6 @@ export type ZAudioEvents = {
 }
 
 export type ZPlayerEvents = ZAudioEvents & {
-  loadTrack: [index: number, metadata: Track]
+  loadTrack: [index: number, metadata: Track | StreamTrack]
   reorder: []
 }

@@ -2,19 +2,24 @@ import type {
   LoadOptions,
   LoopMode,
   ShuffleFn,
+  StreamTrack,
   Track,
   ZPlayerEvents,
   ZPlayerOptions,
 } from './types'
+
 import { ZAudio } from './audio'
 import { defaultShuffle } from './utils/shuffle'
+import { useStreamURL } from './utils/stream'
 
 export class ZPlayer extends ZAudio<ZPlayerEvents> {
   private currentIndex = 0
   private _orderList: number[] = []
-  private _trackList: Track[] = []
+  private _trackList: (Track | StreamTrack)[] = []
   private _loopMode: LoopMode = 'list'
   public shuffleFn: ShuffleFn = defaultShuffle
+  private streamCleanup?: () => void
+
   constructor(config: ZPlayerOptions = {}) {
     const { autoNext, trackList, shuffleFn, loopMode = 'list', ...audioConfig } = config
     super(audioConfig)
@@ -29,15 +34,15 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
     }
   }
 
-  get currentTrack(): Track {
+  get currentTrack(): Track | StreamTrack {
     return this._trackList[this._orderList[this.currentIndex]]
   }
 
-  get trackList(): Track[] {
+  get trackList(): (Track | StreamTrack)[] {
     return this._orderList.map(i => this._trackList[i])
   }
 
-  set trackList(list: Track[]) {
+  set trackList(list: (Track | StreamTrack)[]) {
     this._trackList = list
     this.reorder()
   }
@@ -57,13 +62,13 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
   /**
    * Get track by index, return current track if index is absent
    */
-  public getTrack(index = this.currentIndex): Track | undefined {
+  public getTrack(index = this.currentIndex): Track | StreamTrack | false | undefined {
     if (index < 0 || (this.trackList.length && index > this.trackList.length)) {
-      this.emitError(`Invalid track index: ${index}`)
+      return this.emitError(`Invalid track index: ${index}`)
     }
     const track = this.trackList[this._orderList[index]]
     if (!track) {
-      this.emitError('No track data, please load track first')
+      return this.emitError('No track data, please load track first')
     }
     return track
   }
@@ -88,10 +93,27 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
       this.currentIndex = Math.abs((index + this.trackList.length) % this.trackList.length)
     }
     const track = this.getTrack()
+
     if (!track) {
       return false
     }
-    const result = await this.load(track, options)
+
+    if (this.streamCleanup) {
+      this.streamCleanup()
+      this.streamCleanup = undefined
+    }
+
+    let result
+    if (typeof track.src === 'string') {
+      result = await super.load(track as Track, options)
+    } else {
+      const [src, cleanup] = useStreamURL(await (track as StreamTrack).src(), (track as StreamTrack).mimeType)
+      this.streamCleanup = cleanup
+      result = await super.load(
+        { ...track, src },
+        { mimeType: (track as StreamTrack).mimeType, ...options },
+      )
+    }
     if (result) {
       this.emit('loadTrack', this.currentIndex, track)
     }
@@ -113,6 +135,9 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
   }
 
   public async destroy(): Promise<void> {
+    if (this.streamCleanup) {
+      this.streamCleanup()
+    }
     await super.destroy()
     this._orderList = []
     this.trackList = []
