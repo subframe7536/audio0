@@ -10,7 +10,7 @@ import type {
 
 import { ZAudio } from './audio'
 import { defaultShuffle } from './utils/shuffle'
-import { useStreamURL } from './utils/stream'
+import { isStreamTrack, useStreamURL } from './utils/stream'
 
 export class ZPlayer extends ZAudio<ZPlayerEvents> {
   private currentIndex = 0
@@ -104,15 +104,15 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
     }
 
     let result
-    if (typeof track.src === 'string') {
-      result = await super.load(track as Track, options)
-    } else {
-      const [src, cleanup] = useStreamURL(await (track as StreamTrack).src(), (track as StreamTrack).mimeType)
+    if (isStreamTrack(track)) {
+      const [src, cleanup] = useStreamURL(await track.src(), track.mimeType)
       this.streamCleanup = cleanup
       result = await super.load(
         { ...track, src },
-        { mimeType: (track as StreamTrack).mimeType, ...options },
+        { mimeType: track.mimeType, ...options },
       )
+    } else {
+      result = await super.load(track, options)
     }
     if (result) {
       this.emit('loadTrack', this.currentIndex, track)

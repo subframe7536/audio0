@@ -1,4 +1,6 @@
-export function useStreamURL(stream: ReadableStream, mimeType: string): any {
+import type { StreamTrack, Track } from '../types'
+
+export function useStreamURL(stream: ReadableStream, mimeType: string): [src: string, clean: VoidFunction] {
   const ms = new MediaSource()
   ms.addEventListener('sourceopen', async () => {
     const source = ms.addSourceBuffer(mimeType)
@@ -29,4 +31,8 @@ export function useStreamURL(stream: ReadableStream, mimeType: string): any {
       URL.revokeObjectURL(url)
     },
   ]
+}
+
+export function isStreamTrack(track: Track | StreamTrack): track is StreamTrack {
+  return typeof track.src === 'function'
 }
