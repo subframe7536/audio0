@@ -117,6 +117,7 @@ export type ZAudioEvents = {
   pause: []
   stop: []
   timeupdate: [currentTime: number]
+  fadeDuration: [duration: number]
   volume: [volume: number]
   mute: [isMuted: boolean]
   rate: [playbackRate: number]

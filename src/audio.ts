@@ -1,4 +1,12 @@
-import type { Codecs, LoadingState, LoadOptions, Track, ZAudioErrorCode, ZAudioEvents, ZAudioOptions } from './types'
+import type {
+  Codecs,
+  LoadingState,
+  LoadOptions,
+  Track,
+  ZAudioErrorCode,
+  ZAudioEvents,
+  ZAudioOptions,
+} from './types'
 import type { Promisable } from '@subframe7536/type-utils'
 
 import { Mitt } from 'zen-mitt/class'
@@ -19,6 +27,37 @@ const sessionEvents = [
 ] as const
 type EventIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 
+/**
+ * Audio player class with fade effects and media session support
+ *
+ * @example
+ * ```ts
+ * const audio = new ZAudio();
+ * await audio.load({ src: 'audio.mp3' });
+ * await audio.play();
+ * ```
+ *
+ * @remarks
+ * This class provides the following features:
+ * - Audio playback control (play, pause, stop, seek)
+ * - Volume control with fade effects
+ * - Media session integration
+ * - Custom audio node handling
+ * - Codec support detection
+ * - Event emission for various audio states
+ *
+ * @event load - Emitted when audio is loaded successfully
+ * @event play - Emitted when audio starts playing
+ * @event pause - Emitted when audio is paused
+ * @event stop - Emitted when audio is stopped
+ * @event ended - Emitted when audio playback ends
+ * @event error - Emitted when an error occurs
+ * @event timeupdate - Emitted when playback time updates
+ * @event volume - Emitted when volume changes
+ * @event mute - Emitted when mute state changes
+ * @event rate - Emitted when playback rate changes
+ * @event seek - Emitted when seeking to a specific time
+ */
 export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
   private ctx: AudioContext | undefined
   private sourceNode: MediaElementAudioSourceNode | undefined
@@ -71,31 +110,62 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     })
   }
 
+  /**
+   * Return the duration in seconds of the current media resource.
+   * A NaN value is returned if duration is not available,
+   * or Infinity if the media resource is streaming.
+   */
   get duration(): number {
     return this.audio.duration
   }
 
+  /**
+   * Get a flag that specifies whether playback is playing.
+   */
   get isPlaying(): boolean {
     return !this.audio.paused
   }
 
+  /**
+   * Get the current playback position, in seconds.
+   */
   get currentTime(): number {
     return this.audio.currentTime
   }
 
+  /**
+   * Get the current rate of speed for the media resource to play.
+   * This speed is expressed as a multiple of the normal speed of the media resource.
+   */
   get playbackRate(): number {
     return this.audio.playbackRate
   }
 
+  /**
+   * Set the current rate of speed for the media resource to play.
+   * This speed is expressed as a multiple of the normal speed of the media resource.
+   *
+   * Emit `"rate"` event
+   */
   set playbackRate(rate: number) {
     this.audio.playbackRate = rate
     this.emit('rate', rate)
   }
 
+  /**
+   * Get the current volume for the media resource to play.
+   * The value is between 0 and 1.
+   */
   get volume(): number {
     return this.options.volume
   }
 
+  /**
+   * Set the current volume for the media resource to play.
+   * The value is between 0 and 1.
+   *
+   * Emit `"volume"` event
+   */
   set volume(volume: number) {
     volume = formatVolume(volume)
     this.options.volume = volume
@@ -103,22 +173,39 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     this.emit('volume', volume)
   }
 
+  /**
+   * Get a flag that indicates whether the audio
+   * (either audio or the audio track on video media) is muted.
+   */
   get muted(): boolean {
     return this.audio.muted
   }
 
+  /**
+   * Set a flag that indicates whether the audio
+   * (either audio or the audio track on video media) is muted.
+   *
+   * Emit `"muted"` event
+   */
   set muted(muted: boolean) {
     this.options.volume = muted ? 0 : this.audio.volume
     this.audio.muted = muted
     this.emit('mute', muted)
   }
 
+  /**
+   * Get the fade duration.
+   */
   get fadeDuration(): number {
     return this.options.fadeDuration
   }
 
+  /**
+   * Set the fade duration.
+   */
   set fadeDuration(duration: number) {
     this.options.fadeDuration = duration
+    this.emit('fadeDuration', duration)
   }
 
   private setVolume(v: number, cb?: (time: number) => void): void {
@@ -134,7 +221,10 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     return false
   }
 
-  protected bindSession<T extends EventIndex, _typeonly = typeof sessionEvents[T]>(eventIndex: T, handler: MediaSessionActionHandler): void {
+  protected bindSession<T extends EventIndex, _typeonly = typeof sessionEvents[T]>(
+    eventIndex: T,
+    handler: MediaSessionActionHandler,
+  ): void {
     this.ses?.setActionHandler(sessionEvents[eventIndex], handler)
   }
 
