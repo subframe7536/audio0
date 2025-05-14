@@ -3,11 +3,12 @@ import type { Promisable } from '@subframe7536/type-utils'
 /**
  * Audio error code
  *
- * - `code < 0`: internal logic error
- * - `code = 0`: unknown load error
- * - `code > 1`: known load error, see in [MDN Docs](https://developer.mozilla.org/en-US/docs/Web/API/MediaError/code#media_error_code_constants)
+ * - `code = -1`: Internal logic error
+ * - `code = 0`: Unknown load error
+ * - `code = 1 / 2 / 3 / 4`: known load error, see in [MDN Docs](https://developer.mozilla.org/en-US/docs/Web/API/MediaError/code#media_error_code_constants)
+ * - `code = 5`: Stream load error
  */
-export type ZAudioErrorCode = -1 | 0 | 1 | 2 | 3 | 4
+export type ZAudioErrorCode = -1 | 0 | 1 | 2 | 3 | 4 | 5
 
 export class ZAudioError extends Error {
   public code: ZAudioErrorCode
@@ -77,7 +78,7 @@ export type ZPlayerOptions = ZAudioOptions & {
   /**
    * track list
    */
-  trackList?: Track[]
+  trackList?: (Track | StreamTrack)[]
   /**
    * Track list shuffle function
    * @default {@link defaultShuffle}

@@ -72,7 +72,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
   }
 
   get duration(): number {
-    return this.audio.duration || 0
+    return this.audio.duration
   }
 
   get isPlaying(): boolean {
@@ -207,7 +207,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     const newSrc = metadata.src
 
     const ext = newSrc.match(/^data:audio\/([^;]+);/i)?.[1]
-      || options.mimeType?.split('/')[1].split(';')[0]
+      || options.mimeType?.split('/')?.[1]?.split(';')?.[0]
       || newSrc.split('.').pop()
 
     if (!ext || !this.codecs.has(ext)) {

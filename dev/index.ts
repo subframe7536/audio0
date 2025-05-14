@@ -12,7 +12,10 @@ const forwardButton = document.querySelector('.forward')!
 const backwardButton = document.querySelector('.backward')!
 
 const player = new ZPlayer({
-  trackList: [{ src: ogg }, { src: mp3 }],
+  trackList: [
+    { src: ogg },
+    { src: () => fetch(mp3).then(r => r.body!), mimeType: 'audio/mpeg' },
+  ],
   autoNext: true,
 })
 

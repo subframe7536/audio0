@@ -105,12 +105,24 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
 
     let result
     if (isStreamTrack(track)) {
-      const [src, cleanup] = useStreamURL(await track.src(), track.mimeType)
-      this.streamCleanup = cleanup
-      result = await super.load(
-        { ...track, src },
-        { mimeType: track.mimeType, ...options },
-      )
+      if (!window.MediaSource) {
+        this.emitError('Unsupported platform')
+        result = false
+      } else if (!MediaSource.isTypeSupported(track.mimeType)) {
+        this.emitError('Unsupported mime type')
+        result = false
+      } else {
+        const [src, cleanup] = useStreamURL(
+          await track.src(),
+          track.mimeType,
+          err => this.emitError(err, 5),
+        )
+        this.streamCleanup = cleanup
+        result = await super.load(
+          { ...track, src },
+          { mimeType: track.mimeType, ...options },
+        )
+      }
     } else {
       result = await super.load(track, options)
     }
