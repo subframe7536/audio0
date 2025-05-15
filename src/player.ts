@@ -1,22 +1,16 @@
-import type {
-  LoadOptions,
-  LoopMode,
-  ShuffleFn,
-  StreamTrack,
-  Track,
-  ZPlayerEvents,
-  ZPlayerOptions,
-} from './types'
+import type { LoadOptions, LoopMode, ShuffleFn, TrackLike, ZPlayerEvents, ZPlayerOptions } from './types'
 
 import { ZAudio } from './audio'
+import { LOOP_MODE } from './types'
+import { useArrayBuffer } from './utils/buffer'
 import { defaultShuffle } from './utils/shuffle'
-import { isStreamTrack, useStreamURL } from './utils/stream'
+import { useStream } from './utils/stream'
 
 export class ZPlayer extends ZAudio<ZPlayerEvents> {
   private currentIndex = 0
   private _orderList: number[] = []
-  private _trackList: (Track | StreamTrack)[] = []
-  private _loopMode: LoopMode = 'list'
+  private _trackList: TrackLike[] = []
+  private _loopMode: number = 0
   public shuffleFn: ShuffleFn = defaultShuffle
   private streamCleanup?: () => void
 
@@ -25,7 +19,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
     super(audioConfig)
     this.bindSession(3, () => this.prevTrack())
     this.bindSession(0, () => this.nextTrack())
-    this._loopMode = loopMode
+    this._loopMode = LOOP_MODE.indexOf(loopMode)
     if (trackList) {
       this.trackList = trackList
     }
@@ -34,35 +28,34 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
     }
   }
 
-  get currentTrack(): Track | StreamTrack {
+  get currentTrack(): TrackLike {
     return this._trackList[this._orderList[this.currentIndex]]
   }
 
-  get trackList(): (Track | StreamTrack)[] {
+  get trackList(): TrackLike[] {
     return this._orderList.map(i => this._trackList[i])
   }
 
-  set trackList(list: (Track | StreamTrack)[]) {
+  set trackList(list: TrackLike[]) {
     this._trackList = list
     this.reorder()
   }
 
   get loopMode(): LoopMode {
-    return this._loopMode
-  }
-
-  set loopMode(mode: LoopMode) {
-    this._loopMode = mode
-    if (!this.trackList.length) {
-      return
-    }
-    this.reorder()
+    return LOOP_MODE[this._loopMode]
   }
 
   /**
    * Get track by index, return current track if index is absent
    */
-  public getTrack(index = this.currentIndex): Track | StreamTrack | false | undefined {
+  public addTrack(...track: TrackLike[]): void {
+    this._trackList.push(...track)
+  }
+
+  /**
+   * Get track by index, return current track if index is absent
+   */
+  public getTrack(index = this.currentIndex): TrackLike | false | undefined {
     if (index < 0 || (this.trackList.length && index > this.trackList.length)) {
       return this.emitError(`Invalid track index: ${index}`)
     }
@@ -76,7 +69,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
   /**
    * Reorder track list
    */
-  public reorder(shuffle = this._loopMode === 'random'): void {
+  public reorder(shuffle = this._loopMode === 2): void {
     this.emit('reorder')
     this._orderList = shuffle
       ? this.shuffleFn(this._trackList)
@@ -84,9 +77,29 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
   }
 
   /**
-   * Load track in track list
-   * @param index track index
-   * @param options load options
+   * Changes the loop mode of the player.
+   * If a mode is provided, sets the loop mode to that value.
+   * If no mode is provided, cycles through the loop modes in sequence.
+   * After changing the mode, reorders the playlist according to the new loop mode.
+   *
+   * @param mode The specific loop mode to set. If not provided, cycles to next mode.
+   */
+  public changeLoopMode(mode?: LoopMode): void {
+    if (mode) {
+      const idx = LOOP_MODE.indexOf(mode)
+      this._loopMode = idx === -1 ? 0 : idx
+    } else {
+      this._loopMode = (this._loopMode + 1) % 3
+    }
+    this.reorder()
+  }
+
+  /**
+   * Loads a track at the specified index or the current track if no index is provided.
+   * Handles different types of tracks including streams, buffers, and regular audio sources.
+   *
+   * @param index Index of the track to load. Will wrap around if outside the track list bounds.
+   * @param options Loading options to be passed to the underlying load method.
    */
   public async loadTrack(index?: number, options?: LoadOptions): Promise<boolean> {
     if (index) {
@@ -104,7 +117,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
     }
 
     let result
-    if (isStreamTrack(track)) {
+    if (track.type === 'stream') {
       if (!window.MediaSource) {
         this.emitError('Unsupported platform')
         result = false
@@ -112,7 +125,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
         this.emitError('Unsupported mime type')
         result = false
       } else {
-        const [src, cleanup] = useStreamURL(
+        const [src, cleanup] = useStream(
           await track.src(),
           track.mimeType,
           err => this.emitError(err, 5),
@@ -123,8 +136,18 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
           { mimeType: track.mimeType, ...options },
         )
       }
+    } else if (track.type === 'buffer') {
+      const [src, cleanup] = useArrayBuffer(await track.src(), track.mimeType)
+      this.streamCleanup = cleanup
+      result = await super.load(
+        { ...track, src },
+        { mimeType: track.mimeType, ...options },
+      )
     } else {
-      result = await super.load(track, options)
+      result = await super.load(
+        track,
+        { mimeType: track.mimeType, ...options },
+      )
     }
     if (result) {
       this.emit('loadTrack', this.currentIndex, track)
@@ -147,9 +170,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
   }
 
   public async destroy(): Promise<void> {
-    if (this.streamCleanup) {
-      this.streamCleanup()
-    }
+    this.streamCleanup?.()
     await super.destroy()
     this._orderList = []
     this.trackList = []

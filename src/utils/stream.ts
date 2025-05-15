@@ -1,5 +1,3 @@
-import type { StreamTrack, Track } from '../types'
-
 async function waitForUpdate(source: SourceBuffer): Promise<void> {
   if (source.updating) {
     await new Promise<void>(resolve =>
@@ -12,13 +10,19 @@ async function waitForUpdate(source: SourceBuffer): Promise<void> {
  * Creates a URL for streaming media from a ReadableStream using MediaSource.
  * @param stream - The ReadableStream providing media data
  * @param mimeType - The MIME type of the media
- * @returns A tuple of URL and cleanup function
+ * @example
+ * ```ts
+ * // Use the URL
+ * const [url, cleanup] = useStream(await fetch(url).then(r => r.body!), 'audio/wav')
+ * // Call when done to free memory
+ * cleanup()
+ * ```
  */
-export function useStreamURL(
+export function useStream(
   stream: ReadableStream<Uint8Array>,
   mimeType: string,
   onError?: (err: string) => void,
-): [string, VoidFunction] {
+): [url: string, cleanup: VoidFunction] {
   const ms = new MediaSource()
   let sourceBuffer: SourceBuffer | null = null
 
@@ -72,8 +76,4 @@ export function useStreamURL(
       URL.revokeObjectURL(url)
     },
   ]
-}
-
-export function isStreamTrack(track: Track | StreamTrack): track is StreamTrack {
-  return typeof track.src === 'function'
 }

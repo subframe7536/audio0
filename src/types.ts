@@ -18,20 +18,32 @@ export class ZAudioError extends Error {
   }
 }
 
-export type LoopMode = 'random' | 'list' | 'single'
+export const LOOP_MODE = ['list', 'single', 'random'] as const
+export type LoopMode = typeof LOOP_MODE[number]
 
 export interface TrackInfo extends MediaMetadataInit {
   score?: number
 }
 
 export interface Track extends TrackInfo {
+  type: 'url'
   src: string
+  mimeType?: string
 }
 
 export interface StreamTrack extends TrackInfo {
+  type: 'stream'
   src: () => Promisable<ReadableStream>
   mimeType: string
 }
+
+export interface BufferTrack extends TrackInfo {
+  type: 'buffer'
+  src: () => Promisable<ArrayBuffer>
+  mimeType: string
+}
+
+export type TrackLike = Track | StreamTrack | BufferTrack
 
 /**
  * Shuffle an array
@@ -78,7 +90,7 @@ export type ZPlayerOptions = ZAudioOptions & {
   /**
    * track list
    */
-  trackList?: (Track | StreamTrack)[]
+  trackList?: TrackLike[]
   /**
    * Track list shuffle function
    * @default {@link defaultShuffle}
@@ -122,12 +134,12 @@ export type ZAudioEvents = {
   mute: [isMuted: boolean]
   rate: [playbackRate: number]
   seek: [targetTime: number]
-  load: [metadata: Track]
+  load: [metadata: TrackInfo & { src: string }]
   error: [code: ZAudioErrorCode, err: ZAudioError]
   ended: []
 }
 
 export type ZPlayerEvents = ZAudioEvents & {
-  loadTrack: [index: number, metadata: Track | StreamTrack]
+  loadTrack: [index: number, metadata: TrackLike]
   reorder: []
 }

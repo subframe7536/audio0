@@ -2,7 +2,7 @@ import type {
   Codecs,
   LoadingState,
   LoadOptions,
-  Track,
+  TrackInfo,
   ZAudioErrorCode,
   ZAudioEvents,
   ZAudioOptions,
@@ -298,7 +298,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
    * @param metadata track info
    * @param options load options
    */
-  public async load(metadata: Track, options: LoadOptions = {}): Promise<boolean> {
+  public async load(metadata: TrackInfo & { src: string }, options: LoadOptions = {}): Promise<boolean> {
     const newSrc = metadata.src
 
     const ext = newSrc.match(/^data:audio\/([^;]+);/i)?.[1]

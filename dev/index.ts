@@ -1,6 +1,8 @@
+import type { TrackLike } from '../src'
+
 import { ZPlayer } from '../src'
 // import { createWeightedArtistShuffle, defaultShuffle } from '../src/utils/shuffle'
-import { normalizeAudioBuffer } from '../src/utils/buffer'
+import { normalizeAudioBuffer } from '../src/utils/common'
 import mp3 from './test.mp3?url'
 import ogg from './test.ogg?url'
 
@@ -13,8 +15,8 @@ const backwardButton = document.querySelector('.backward')!
 
 const player = new ZPlayer({
   trackList: [
-    { src: ogg },
-    { src: () => fetch(mp3).then(r => r.body!), mimeType: 'audio/mpeg' },
+    { src: ogg, type: 'url' },
+    { src: () => fetch(mp3).then(r => r.body!), mimeType: 'audio/mpeg', type: 'stream' },
   ],
   autoNext: true,
 })
