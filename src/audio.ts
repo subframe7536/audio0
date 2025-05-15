@@ -237,11 +237,6 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     this.cleanup.push(bindEventListenerWithCleanup(this.audio, event, handler))
   }
 
-  /**
-   * Handle audio context and nodes. If return value is audio nodes, reconnect them to destination
-   *
-   * Will do nothing if audio context is not created
-   */
   public handleContext(
     fn: (
       ctx: AudioContext,
@@ -254,38 +249,48 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
       nodes: AudioNode[]
     ) => Promise<AudioNode[] | undefined | void | null>,
   ): Promise<void>
+  /**
+   * Handle audio context and nodes. If return value is audio nodes, reconnect them to destination
+   *
+   * Do nothing if AudioContext is not created
+   * @param fn Function to handle audio context and nodes
+   */
   public handleContext(
     fn: (
       ctx: AudioContext,
       nodes: AudioNode[]
     ) => Promisable<AudioNode[] | undefined | void | null>,
   ): Promisable<void> {
-    const conn = (nodes: AudioNode[] | undefined | void | null): void => {
-      this.sourceNode!.disconnect()
-      for (let i = 0; i < this.nodes.length; i++) {
-        this.nodes[i].disconnect()
-      }
-      const len = nodes?.length
-      if (!len) {
-        this.sourceNode!.connect(this.gainNode!)
-        return
-      }
-      this.sourceNode!.connect(nodes[0])
-      for (let i = 0; i < len - 1; i++) {
-        nodes[i].connect(nodes[i + 1])
-      }
-      nodes[len - 1].connect(this.gainNode!)
-      this.nodes = nodes
-    }
     if (!this.ctx) {
       return
     }
-    const result = fn(this.ctx, this.nodes)
-    if (result instanceof Promise) {
-      result.then(nodes => conn(nodes))
-    } else {
-      conn(result)
+
+    const reconnectNodes = (
+      nodes: AudioNode[] | undefined | void | null,
+    ): void => {
+      if (!nodes) {
+        return
+      }
+
+      this.sourceNode!.disconnect()
+      this.nodes.forEach(node => node.disconnect())
+
+      if (!nodes.length) {
+        this.sourceNode!.connect(this.gainNode!)
+        this.nodes = []
+        return
+      }
+
+      this.sourceNode!.connect(nodes[0])
+      nodes.reduce((prev, curr) => (prev.connect(curr), curr))
+      nodes[nodes.length - 1].connect(this.gainNode!)
+      this.nodes = nodes
     }
+
+    const result = fn(this.ctx, [...this.nodes])
+    return result instanceof Promise
+      ? result.then(reconnectNodes)
+      : reconnectNodes(result)
   }
 
   /**

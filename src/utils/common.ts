@@ -3,7 +3,7 @@ import type { Codecs } from '../types'
 
 export function getCodecs(): Codecs {
   let testAudio = new Audio()
-  const checkAudioMime = (mime: string): boolean => !!testAudio.canPlayType('audio/' + mime)
+  const checkAudioMime = (mime: string): boolean => testAudio.canPlayType('audio/' + mime) !== ''
 
   const ua = globalThis.navigator.userAgent
   const isSafari = ua.includes('Safari') && !ua.includes('Chrome')
