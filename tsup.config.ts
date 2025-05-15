@@ -5,6 +5,5 @@ export default defineConfig({
   clean: true,
   format: ['esm', 'cjs'],
   entry: ['./src/index.ts'],
-  noExternal: ['weighted-shuffle'],
   treeshake: true,
 })
