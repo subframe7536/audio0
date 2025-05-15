@@ -1,11 +1,5 @@
 import type { StreamTrack, Track } from '../types'
 
-function eos(ms: MediaSource): void {
-  if (ms.readyState === 'open') {
-    ms.endOfStream()
-  }
-}
-
 async function waitForUpdate(source: SourceBuffer): Promise<void> {
   if (source.updating) {
     await new Promise<void>(resolve =>
@@ -26,41 +20,55 @@ export function useStreamURL(
   onError?: (err: string) => void,
 ): [string, VoidFunction] {
   const ms = new MediaSource()
+  let sourceBuffer: SourceBuffer | null = null
 
-  ms.addEventListener('sourceopen', async () => {
-    const source = ms.addSourceBuffer(mimeType)
-    const reader = stream.getReader()
+  const isMediaStreamOpen = (): boolean => ms.readyState === 'open'
 
-    const appendToSource = async (chunk: Uint8Array): Promise<void> => {
-      await waitForUpdate(source)
-      source.appendBuffer(chunk)
+  const onSourceOpen = async (): Promise<void> => {
+    if (isMediaStreamOpen()) {
+      return
     }
-
+    const reader = stream.getReader()
     try {
-      while (true) {
+      sourceBuffer = ms.addSourceBuffer(mimeType)
+      while (isMediaStreamOpen()) {
         const { done, value } = await reader.read()
+
         if (done) {
-          await waitForUpdate(source)
-          eos(ms)
+          await waitForUpdate(sourceBuffer)
+          ms.endOfStream()
+          reader.releaseLock()
           return
         }
+
         if (value) {
-          await appendToSource(value)
+          await waitForUpdate(sourceBuffer)
+          sourceBuffer.appendBuffer(value)
         }
       }
-    } catch (error) {
-      onError?.(error instanceof Error ? error.message : String(error))
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : String(err))
+    } finally {
+      reader.releaseLock()
     }
-  })
+  }
+
+  ms.addEventListener('sourceopen', onSourceOpen)
 
   const url = URL.createObjectURL(ms)
 
   return [
     url,
     () => {
-      if (ms.readyState === 'open') {
-        eos(ms)
+      ms.removeEventListener('sourceopen', onSourceOpen)
+
+      if (sourceBuffer && isMediaStreamOpen()) {
+        try {
+          sourceBuffer.abort()
+        } catch { }
       }
+
+      ms.endOfStream()
       URL.revokeObjectURL(url)
     },
   ]
