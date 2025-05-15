@@ -63,7 +63,8 @@ export function secondToTime(second: number): string {
   return (second < 3600 ? '' : padStartZero(second / 3600) + ':')
     + padStartZero((second / 60) % 60) + ':'
     + padStartZero(second % 60)
-}/* eslint-disable unicorn/no-new-array */
+}
+
 /**
  * Parse audio buffer to array, use for generate audio waveform
  * @param buf source audio buffer
@@ -71,7 +72,6 @@ export function secondToTime(second: number): string {
  * @param max max value (0 ~ 1), default 0.9
  * @param min min value (0 ~ 1), default 0.1
  */
-
 export function normalizeAudioBuffer(
   buf: AudioBuffer,
   blockNum = 1000,
@@ -82,6 +82,7 @@ export function normalizeAudioBuffer(
   // `Math.floor` is faster than `~~`
   const blockSize = Math.floor(rawData.length / blockNum)
   // static array length
+  // eslint-disable-next-line unicorn/no-new-array
   const result = new Array<number>(blockNum)
   let tempMax = 0
 
