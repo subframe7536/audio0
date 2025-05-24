@@ -43,7 +43,7 @@ import ogg from './test.ogg?url'
 
 const player = new ZPlayer({
   trackList: [
-    { src: ogg, type: 'url' },
+    { src: ogg },
     { src: () => fetch(mp3).then(r => r.body!), mimeType: 'audio/mpeg', type: 'stream' }
   ],
   autoNext: true,

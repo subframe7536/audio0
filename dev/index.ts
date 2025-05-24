@@ -1,5 +1,3 @@
-import type { TrackLike } from '../src'
-
 import { ZPlayer } from '../src'
 // import { createWeightedArtistShuffle, defaultShuffle } from '../src/utils/shuffle'
 import { normalizeAudioBuffer } from '../src/utils/common'
@@ -15,8 +13,8 @@ const backwardButton = document.querySelector('.backward')!
 
 const player = new ZPlayer({
   trackList: [
-    { src: ogg, type: 'url' },
-    { src: mp3, type: 'url' },
+    { src: ogg },
+    { src: () => fetch(mp3).then(r => r.arrayBuffer()), mimeType: 'audio/mpeg', type: 'buffer' },
     { src: () => fetch(mp3).then(r => r.body!), mimeType: 'audio/mpeg', type: 'stream' },
   ],
   autoNext: true,
@@ -28,8 +26,9 @@ player.on('timeupdate', (time) => {
 
 player.on('error', console.error)
 player.on('reorder', () => console.log('reorder'))
-player.on('load', ({ src }) => {
-  fetch(src)
+player.on('load', (data) => {
+  console.log(data)
+  fetch(data.src)
     .then(res => res.arrayBuffer())
     .then(data => new OfflineAudioContext({ length: 1, sampleRate: 44100 }).decodeAudioData(data))
     .then((buffer) => {

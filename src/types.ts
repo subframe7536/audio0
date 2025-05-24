@@ -25,8 +25,12 @@ export interface TrackInfo extends MediaMetadataInit {
   score?: number
 }
 
+export interface ParsedTrackInfo extends TrackInfo {
+  src: string
+}
+
 export interface Track extends TrackInfo {
-  type: 'url'
+  type?: 'url'
   src: string
   mimeType?: string
 }
@@ -134,12 +138,12 @@ export type ZAudioEvents = {
   mute: [isMuted: boolean]
   rate: [playbackRate: number]
   seek: [targetTime: number]
-  load: [metadata: TrackInfo & { src: string }]
+  load: [metadata: ParsedTrackInfo]
   error: [code: ZAudioErrorCode, err: ZAudioError]
   ended: []
 }
 
 export type ZPlayerEvents = ZAudioEvents & {
-  loadTrack: [index: number, metadata: TrackLike]
+  loadTrack: [index: number, metadata: Track & { type?: 'url' | 'stream' | 'buffer' }]
   reorder: []
 }

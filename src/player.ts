@@ -1,4 +1,12 @@
-import type { LoadOptions, LoopMode, ShuffleFn, TrackLike, ZPlayerEvents, ZPlayerOptions } from './types'
+import type {
+  LoadOptions,
+  LoopMode,
+  ParsedTrackInfo,
+  ShuffleFn,
+  TrackLike,
+  ZPlayerEvents,
+  ZPlayerOptions,
+} from './types'
 
 import { ZAudio } from './audio'
 import { LOOP_MODE } from './types'
@@ -102,55 +110,52 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
    * @param options Loading options to be passed to the underlying load method.
    */
   public async loadTrack(index?: number, options?: LoadOptions): Promise<boolean> {
-    if (index) {
+    // Use index >= 0 to allow index 0
+    if (typeof index === 'number') {
       this.currentIndex = Math.abs((index + this.trackList.length) % this.trackList.length)
     }
     const track = this.getTrack()
-
     if (!track) {
       return false
     }
 
-    if (this.streamCleanup) {
-      this.streamCleanup()
-      this.streamCleanup = undefined
-    }
+    // Cleanup previous stream if needed
+    this.streamCleanup?.()
+    this.streamCleanup = undefined
 
-    let result
-    if (track.type === 'stream') {
-      if (!window.MediaSource) {
-        this.emitError('Unsupported platform')
-        result = false
-      } else if (!MediaSource.isTypeSupported(track.mimeType)) {
-        this.emitError('Unsupported mime type')
-        result = false
-      } else {
-        const [src, cleanup] = useStream(
-          await track.src(),
-          track.mimeType,
-          err => this.emitError(err, 5),
-        )
-        this.streamCleanup = cleanup
-        result = await super.load(
-          { ...track, src },
-          { mimeType: track.mimeType, ...options },
-        )
+    let info: ParsedTrackInfo
+    const mimeType = track.mimeType || ''
+
+    switch (track.type) {
+      case 'stream': {
+        if (!window.MediaSource) {
+          return this.emitError('Unsupported platform')
+        } else if (!MediaSource.isTypeSupported(mimeType)) {
+          return this.emitError('Unsupported mime type')
+        } else {
+          const [src, cleanup] = useStream(
+            await track.src(),
+            mimeType,
+            err => this.emitError(err, 5),
+          )
+          this.streamCleanup = cleanup
+          info = { ...track, src }
+        }
+        break
       }
-    } else if (track.type === 'buffer') {
-      const [src, cleanup] = useArrayBuffer(await track.src(), track.mimeType)
-      this.streamCleanup = cleanup
-      result = await super.load(
-        { ...track, src },
-        { mimeType: track.mimeType, ...options },
-      )
-    } else {
-      result = await super.load(
-        track,
-        { mimeType: track.mimeType, ...options },
-      )
+      case 'buffer': {
+        const [src, cleanup] = useArrayBuffer(await track.src(), mimeType)
+        this.streamCleanup = cleanup
+        info = { ...track, src }
+        break
+      }
+      default: {
+        info = track
+      }
     }
+    const result = await super.load(info, { mimeType, ...options })
     if (result) {
-      this.emit('loadTrack', this.currentIndex, track)
+      this.emit('loadTrack', this.currentIndex, info)
     }
     return result
   }
