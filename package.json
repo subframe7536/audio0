@@ -27,7 +27,7 @@
     "dist"
   ],
   "scripts": {
-    "dev": "vite serve dev",
+    "dev": "bun --bun vite serve dev",
     "build": "tsup",
     "release": "pnpm run build && bumpp --all && npm publish",
     "format": "eslint . --fix"
