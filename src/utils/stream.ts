@@ -29,9 +29,6 @@ export function useStream(
   const isMediaStreamOpen = (): boolean => ms.readyState === 'open'
 
   const onSourceOpen = async (): Promise<void> => {
-    if (isMediaStreamOpen()) {
-      return
-    }
     const reader = stream.getReader()
     try {
       sourceBuffer = ms.addSourceBuffer(mimeType)
@@ -66,13 +63,13 @@ export function useStream(
     () => {
       ms.removeEventListener('sourceopen', onSourceOpen)
 
-      if (sourceBuffer && isMediaStreamOpen()) {
+      if (isMediaStreamOpen()) {
         try {
-          sourceBuffer.abort()
+          sourceBuffer?.abort()
         } catch { }
-      }
 
-      ms.endOfStream()
+        ms.endOfStream()
+      }
       URL.revokeObjectURL(url)
     },
   ]
