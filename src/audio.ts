@@ -307,11 +307,11 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     }
 
     const newSrc = metadata.src
-    const ext = newSrc.match(/^data:audio\/([^;]+);/i)?.[1]
+    const ext = newSrc.split('?', 1)[0].match(/\.([^.]+)$/)?.[1]
       || options.mimeType?.split('/')[1]?.split(';')[0]
-      || newSrc.split('.').pop()
+      || newSrc.match(/^data:audio\/([^;]+);/i)?.[1]
 
-    if (!ext || !this.codecs.has(ext)) {
+    if (!ext || !this.codecs.has(ext.toLowerCase())) {
       return this.emitError(`MIMETYPE ${ext} is unsupported`)
     }
 
