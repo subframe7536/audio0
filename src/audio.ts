@@ -208,11 +208,13 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     this.emit('fadeDuration', duration)
   }
 
-  private setVolume(v: number, cb?: (time: number) => void): void {
+  private setVolume(v: number): number {
     const currentTime = this.ctx!.currentTime
-    this.gainNode!.gain.cancelAndHoldAtTime(currentTime)
-    this.gainNode!.gain.setValueAtTime(v, currentTime)
-    cb?.(currentTime)
+    this.gainNode!
+      .gain
+      .cancelScheduledValues(currentTime)
+      .setValueAtTime(v, currentTime)
+    return currentTime
   }
 
   protected emitError(msg: string, code: ZAudioErrorCode = -1): false {
@@ -468,16 +470,10 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
       this.setVolume(to)
       return
     }
-    from = formatVolume(from)
-    to = formatVolume(to)
-    const fadeSeconds = fadeDuration / 1e3
-    this.setVolume(
-      from,
-      currentTime => this.gainNode!.gain.setValueCurveAtTime(
-        [from, (from + to) / 1.5, to],
-        currentTime,
-        fadeSeconds,
-      ),
+    const currentTime = this.setVolume(formatVolume(from))
+    this.gainNode?.gain.linearRampToValueAtTime(
+      formatVolume(to),
+      currentTime + fadeDuration / 1e3,
     )
     await sleep(fadeDuration)
   }
