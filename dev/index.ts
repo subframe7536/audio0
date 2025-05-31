@@ -34,7 +34,7 @@ player.on('timeupdate', (time) => {
 
 player.on('error', (err) => {
   console.error(err)
-  player.nextTrack()
+  // player.nextTrack()
 })
 player.on('reorder', () => console.log('reorder'))
 player.on('load', (data) => {
