@@ -131,7 +131,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
         if (!window.MediaSource) {
           return this.emitError('Unsupported platform')
         } else if (!MediaSource.isTypeSupported(mimeType)) {
-          return this.emitError('Unsupported mime type')
+          return this.emitError(`Unsupported mime type: ${mimeType}`)
         } else {
           const [src, cleanup] = useStream(
             await track.src(),

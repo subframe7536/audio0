@@ -139,7 +139,7 @@ export type ZAudioEvents = {
   rate: [playbackRate: number]
   seek: [targetTime: number]
   load: [metadata: ParsedTrackInfo]
-  error: [code: ZAudioErrorCode, err: ZAudioError]
+  error: [err: ZAudioError, code: ZAudioErrorCode]
   ended: []
 }
 

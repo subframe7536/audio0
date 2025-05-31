@@ -14,8 +14,16 @@ const backwardButton = document.querySelector('.backward')!
 const player = new ZPlayer({
   trackList: [
     { src: ogg },
-    { src: () => fetch(mp3).then(r => r.arrayBuffer()), mimeType: 'audio/mpeg', type: 'buffer' },
-    { src: () => fetch(mp3).then(r => r.body!), mimeType: 'audio/mpeg', type: 'stream' },
+    {
+      src: () => fetch(mp3).then(r => r.arrayBuffer()),
+      mimeType: 'audio/mpeg',
+      type: 'buffer',
+    },
+    {
+      src: () => fetch(mp3).then(r => r.body!),
+      mimeType: 'audio/mpeg',
+      type: 'stream',
+    },
   ],
   autoNext: true,
 })
@@ -24,7 +32,10 @@ player.on('timeupdate', (time) => {
   player.handleContext(ctx => console.log(time, ctx.currentTime, player.duration))
 })
 
-player.on('error', console.error)
+player.on('error', (err) => {
+  console.error(err)
+  player.nextTrack()
+})
 player.on('reorder', () => console.log('reorder'))
 player.on('load', (data) => {
   console.log(data)

@@ -219,7 +219,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
 
   protected emitError(msg: string, code: ZAudioErrorCode = -1): false {
     this.state = 'error'
-    this.emit('error', code, new ZAudioError(code, msg))
+    this.emit('error', new ZAudioError(code, msg), code)
     return false
   }
 
@@ -301,19 +301,18 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
    * @param options load options
    */
   public async load(metadata: ParsedTrackInfo, options: LoadOptions = {}): Promise<boolean> {
-    const newSrc = metadata.src
+    const autoPlay = options.autoPlay ?? this.isPlaying
+    if (this.isPlaying) {
+      await this.stop()
+    }
 
+    const newSrc = metadata.src
     const ext = newSrc.match(/^data:audio\/([^;]+);/i)?.[1]
       || options.mimeType?.split('/')[1]?.split(';')[0]
       || newSrc.split('.').pop()
 
     if (!ext || !this.codecs.has(ext)) {
-      return this.emitError('No mime type or unsupported')
-    }
-
-    const autoPlay = options.autoPlay ?? this.isPlaying
-    if (autoPlay) {
-      await this.stop()
+      return this.emitError(`MIMETYPE ${ext} is unsupported`)
     }
 
     if (!this.ctx) {
