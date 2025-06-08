@@ -14,7 +14,7 @@ import { Mitt } from 'zen-mitt/class'
 import { ZAudioError } from './types'
 import { bindEventListenerWithCleanup, clamp, formatVolume, getCodecs, sleep } from './utils/common'
 
-/// keep-sorted
+// Keep order
 const sessionEvents = [
   'nexttrack',
   'pause',
