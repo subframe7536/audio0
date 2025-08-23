@@ -68,7 +68,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
   protected options: Required<Omit<ZAudioOptions, 'mediaSession'>>
   protected ses: MediaSession | undefined
   public codecs: Codecs
-  public audio = new Audio()
+  public audio: HTMLAudioElement = new Audio()
   public state: LoadingState = 'empty'
   public constructor(options: ZAudioOptions = {}) {
     super()
@@ -391,7 +391,6 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
       return false
     }
     try {
-      // @ts-expect-error https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/state#resuming_interrupted_play_states_in_ios_safari
       if (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted') {
         await this.ctx.resume()
       }
@@ -463,7 +462,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
   public async fade(
     from: number,
     to: number,
-    fadeDuration = this.fadeDuration,
+    fadeDuration: number = this.fadeDuration,
   ): Promise<void> {
     if (fadeDuration <= 0) {
       this.setVolume(to)

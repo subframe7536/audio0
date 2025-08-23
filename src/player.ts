@@ -63,7 +63,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
   /**
    * Get track by index, return current track if index is absent
    */
-  public getTrack(index = this.currentIndex): TrackLike | false | undefined {
+  public getTrack(index: number = this.currentIndex): TrackLike | false | undefined {
     if (index < 0 || (this.trackList.length && index > this.trackList.length)) {
       return this.emitError(`Invalid track index: ${index}`)
     }
@@ -77,7 +77,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
   /**
    * Reorder track list
    */
-  public reorder(shuffle = this._loopMode === 2): void {
+  public reorder(shuffle: boolean = this._loopMode === 2): void {
     this.emit('reorder')
     this._orderList = shuffle
       ? this.shuffleFn(this._trackList)

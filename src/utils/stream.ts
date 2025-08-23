@@ -44,7 +44,7 @@ export function useStream(
 
         if (value) {
           await waitForUpdate(sourceBuffer)
-          sourceBuffer.appendBuffer(value)
+          sourceBuffer.appendBuffer(value as Uint8Array<ArrayBuffer>)
         }
       }
     } catch (err) {

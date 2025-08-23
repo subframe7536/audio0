@@ -14,7 +14,7 @@ type EQ<T extends readonly number[]> = {
  * const eq = createEqualizer(ctx, defaultFeq)
  * const eq1 = createEqualizer(ctx, [100, 200, 300, 400, 500] as const)
  */
-export function createEqualizer<T extends readonly number[]>(
+export function createEqualizer<T extends readonly number[] | number[]>(
   ctx: AudioContext,
   freq: T,
   handleNode?: (band: BiquadFilterNode, freq: T[number], index: number) => void,
