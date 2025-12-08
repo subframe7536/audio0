@@ -19,15 +19,16 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
   private _orderList: number[] = []
   private _trackList: TrackLike[] = []
   private _loopMode: number = 0
-  public shuffleFn: ShuffleFn = defaultShuffle
+  public shuffleFn: ShuffleFn
   private streamCleanup?: () => void
 
   constructor(config: ZPlayerOptions = {}) {
-    const { autoNext, trackList, shuffleFn, loopMode = 'list', ...audioConfig } = config
+    const { autoNext, trackList, shuffleFn = defaultShuffle, loopMode = 'list', ...audioConfig } = config
     super(audioConfig)
     this.bindSession(3, () => this.prevTrack())
     this.bindSession(0, () => this.nextTrack())
     this._loopMode = LOOP_MODE.indexOf(loopMode)
+    this.shuffleFn = shuffleFn
     if (trackList) {
       this.trackList = trackList
     }

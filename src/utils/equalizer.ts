@@ -1,6 +1,6 @@
 export const defaultFreq = [31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000] as const
 
-type EQ<T extends readonly number[]> = {
+interface EQ<T extends readonly number[]> {
   nodes: () => BiquadFilterNode[]
   handle: (targetFreq: T[number], fn: (band: BiquadFilterNode) => void) => void
 }

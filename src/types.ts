@@ -90,7 +90,7 @@ export interface ZAudioOptions {
   extraAudioNodes?: (ctx: AudioContext) => AudioNode[] | (() => AudioNode[])
 }
 
-export type ZPlayerOptions = ZAudioOptions & {
+export interface ZPlayerOptions extends ZAudioOptions {
   /**
    * track list
    */
@@ -110,7 +110,7 @@ export type ZPlayerOptions = ZAudioOptions & {
   loopMode?: LoopMode
 }
 
-export type LoadOptions = {
+export interface LoadOptions {
   /**
    * Audio mime type
    */
@@ -128,7 +128,7 @@ export type LoadOptions = {
 
 export type LoadingState = 'empty' | 'loading' | 'loaded' | 'error'
 
-export type ZAudioEvents = {
+export interface ZAudioEvents {
   play: []
   pause: []
   stop: []
@@ -143,7 +143,7 @@ export type ZAudioEvents = {
   ended: []
 }
 
-export type ZPlayerEvents = ZAudioEvents & {
+export interface ZPlayerEvents extends ZAudioEvents {
   loadTrack: [index: number, metadata: Track & { type?: 'url' | 'stream' | 'buffer' }]
   reorder: []
 }
