@@ -37,7 +37,7 @@ type EventIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
  * await audio.play();
  * ```
  *
- * @remarks
+ * @description
  * This class provides the following features:
  * - Audio playback control (play, pause, stop, seek)
  * - Volume control with fade effects
