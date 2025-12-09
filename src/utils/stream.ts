@@ -1,6 +1,8 @@
+import { bindEventListenerWithCleanup } from './common'
+
 async function waitForUpdate(source: SourceBuffer): Promise<void> {
   if (source.updating) {
-    await new Promise<void>(resolve =>
+    await new Promise<void>((resolve) =>
       source.addEventListener('updateend', () => resolve(), { once: true }),
     )
   }
@@ -25,11 +27,12 @@ export function useStream(
 ): [url: string, cleanup: VoidFunction] {
   const ms = new MediaSource()
   let sourceBuffer: SourceBuffer | null = null
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
 
   const isMediaStreamOpen = (): boolean => ms.readyState === 'open'
 
   const onSourceOpen = async (): Promise<void> => {
-    const reader = stream.getReader()
+    reader = stream.getReader()
     try {
       sourceBuffer = ms.addSourceBuffer(mimeType)
       while (isMediaStreamOpen()) {
@@ -37,8 +40,9 @@ export function useStream(
 
         if (done) {
           await waitForUpdate(sourceBuffer)
-          ms.endOfStream()
-          reader.releaseLock()
+          if (isMediaStreamOpen()) {
+            ms.endOfStream()
+          }
           return
         }
 
@@ -50,25 +54,36 @@ export function useStream(
     } catch (err) {
       onError?.(err instanceof Error ? err.message : String(err))
     } finally {
-      reader.releaseLock()
+      reader?.releaseLock()
+      reader = null
     }
   }
 
-  ms.addEventListener('sourceopen', onSourceOpen)
+  const cleanupListener = bindEventListenerWithCleanup(ms, 'sourceopen', onSourceOpen)
 
   const url = URL.createObjectURL(ms)
 
   return [
     url,
     () => {
-      ms.removeEventListener('sourceopen', onSourceOpen)
+      cleanupListener()
+
+      // Cancel the reader if still active
+      if (reader) {
+        try {
+          reader.cancel()
+        } catch {}
+        reader = null
+      }
 
       if (isMediaStreamOpen()) {
         try {
           sourceBuffer?.abort()
-        } catch { }
+        } catch {}
 
-        ms.endOfStream()
+        try {
+          ms.endOfStream()
+        } catch {}
       }
       URL.revokeObjectURL(url)
     },
