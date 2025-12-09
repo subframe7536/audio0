@@ -1,3 +1,5 @@
+import { useStream } from './stream'
+
 /**
  * Creates a URL for an ArrayBuffer and returns both the URL and a cleanup function.
  * @param buf - The ArrayBuffer to create a URL for
@@ -14,8 +16,5 @@ export function useArrayBuffer(
   buf: ArrayBuffer,
   type: string,
 ): [url: string, cleanup: VoidFunction] {
-  const blob = new Blob([buf], { type })
-  const url = URL.createObjectURL(blob)
-
-  return [url, () => URL.revokeObjectURL(url)]
+  return useStream(new Blob([buf], { type }).stream(), type)
 }
