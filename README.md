@@ -93,7 +93,7 @@ function createWeightedArtistShuffle(getLimit?: GetLimitFn): ShuffleIndexFn
  */
 function createEqualizer<T extends readonly number[]>(ctx: AudioContext, freq: T, handleNode?: (band: BiquadFilterNode, freq: T[number], index: number) => void): EQ<T>
 
-function bindEventListenerWithCleanup(el: EventTarget, type: string, handler: EventListener): VoidFunction
+function bindEventListenerWithCleanup(el: EventTarget, type: string, handler: EventListener, options?: boolean | AddEventListenerOptions): VoidFunction
 
 function secondToTime(second: number): string
 

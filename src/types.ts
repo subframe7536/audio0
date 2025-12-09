@@ -19,7 +19,7 @@ export class ZAudioError extends Error {
 }
 
 export const LOOP_MODE = ['list', 'single', 'random'] as const
-export type LoopMode = typeof LOOP_MODE[number]
+export type LoopMode = (typeof LOOP_MODE)[number]
 
 export interface TrackInfo extends MediaMetadataInit {
   score?: number
@@ -58,7 +58,20 @@ export type ShuffleFn = (trackList: TrackInfo[]) => number[]
 
 export type Codecs = Set<string>
 
-export interface ZAudioOptions {
+interface RetryOptions {
+  /**
+   * Number of retry attempts for network errors
+   * @default 3
+   */
+  retryCount?: number
+  /**
+   * Delay between retry attempts in milliseconds
+   * @default 1000
+   */
+  retryDelay?: number
+}
+
+export interface ZAudioOptions extends RetryOptions {
   /**
    * Fade duration
    * @default 500
@@ -88,6 +101,11 @@ export interface ZAudioOptions {
    * @param ctx audio context
    */
   extraAudioNodes?: (ctx: AudioContext) => AudioNode[] | (() => AudioNode[])
+  /**
+   * Enable auto unlock audio on user interaction for mobile browsers
+   * @default true
+   */
+  autoUnlock?: boolean
 }
 
 export interface ZPlayerOptions extends ZAudioOptions {
@@ -110,7 +128,7 @@ export interface ZPlayerOptions extends ZAudioOptions {
   loopMode?: LoopMode
 }
 
-export interface LoadOptions {
+export interface LoadOptions extends RetryOptions {
   /**
    * Audio mime type
    */
@@ -128,7 +146,8 @@ export interface LoadOptions {
 
 export type LoadingState = 'empty' | 'loading' | 'loaded' | 'error'
 
-export interface ZAudioEvents {
+// oxlint-disable-next-line consistent-type-definitions
+export type ZAudioEvents = {
   play: []
   pause: []
   stop: []

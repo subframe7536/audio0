@@ -38,7 +38,6 @@ player.on('error', (err) => {
 })
 player.on('reorder', () => console.log('reorder'))
 player.on('load', (data) => {
-  console.log(data)
   fetch(data.src)
     .then((res) => res.arrayBuffer())
     .then((data) => new OfflineAudioContext({ length: 1, sampleRate: 44100 }).decodeAudioData(data))

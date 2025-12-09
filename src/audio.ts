@@ -63,6 +63,8 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
   private sourceNode: MediaElementAudioSourceNode | undefined
   private gainNode: GainNode | undefined
   private nodes: AudioNode[] = []
+  private unlockCleanup?: () => void
+  private audioUnlocked: boolean = false
   protected cleanup: VoidFunction[] = []
   protected isEnding = false
   protected options: Required<Omit<ZAudioOptions, 'mediaSession'>>
@@ -77,6 +79,9 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
       fadeDuration: 500,
       volume: 0.5,
       timeout: 10000,
+      retryCount: 3,
+      retryDelay: 1000,
+      autoUnlock: true,
       // @ts-expect-error polyfill
       getAudioContext: () => new (globalThis.AudioContext || globalThis.webkitAudioContext)(),
       extraAudioNodes: () => [],
@@ -88,9 +93,15 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     this.bindSession(2, () => this.play())
     this.bindSession(1, () => this.pause())
     this.bindSession(7, () => this.stop())
-    this.bindSession(6, detail => detail.seekTime && this.seek(detail.seekTime))
-    this.bindSession(5, detail => detail.seekOffset && this.seek(this.currentTime + detail.seekOffset))
-    this.bindSession(4, detail => detail.seekOffset && this.seek(this.currentTime - detail.seekOffset))
+    this.bindSession(6, (detail) => detail.seekTime && this.seek(detail.seekTime))
+    this.bindSession(
+      5,
+      (detail) => detail.seekOffset && this.seek(this.currentTime + detail.seekOffset),
+    )
+    this.bindSession(
+      4,
+      (detail) => detail.seekOffset && this.seek(this.currentTime - detail.seekOffset),
+    )
     this.bindListener('ended', () => this.emit('ended'))
     this.bindListener('timeupdate', () => {
       this.ses?.setPositionState?.({
@@ -104,10 +115,25 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
         const targetFadeDuration = (this.duration - this.currentTime) * 1e3
         if (targetFadeDuration < this.fadeDuration) {
           this.isEnding = true
-          this.fade(this.gainNode!.gain.value, 0, targetFadeDuration)
+          void this.fade(0, targetFadeDuration)
         }
       }
     })
+
+    this.ctx = this.options.getAudioContext()
+    this.gainNode = this.ctx.createGain()
+    this.gainNode.gain.setValueAtTime(this.volume, this.ctx.currentTime)
+    this.sourceNode = this.ctx.createMediaElementSource(this.audio)
+    this.gainNode.connect(this.ctx.destination)
+    this.handleContext((ctx) => {
+      const nodes = this.options.extraAudioNodes(ctx)
+      return Array.isArray(nodes) ? nodes : nodes()
+    })
+    this.setVolume(this.volume)
+
+    if (this.options.autoUnlock) {
+      this.setupAutoUnlock()
+    }
   }
 
   /**
@@ -210,10 +236,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
 
   private setVolume(v: number): number {
     const currentTime = this.ctx!.currentTime
-    this.gainNode!
-      .gain
-      .cancelScheduledValues(currentTime)
-      .setValueAtTime(v, currentTime)
+    this.gainNode!.gain.cancelScheduledValues(currentTime).setValueAtTime(v, currentTime)
     return currentTime
   }
 
@@ -223,7 +246,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     return false
   }
 
-  protected bindSession<T extends EventIndex, _typeonly = typeof sessionEvents[T]>(
+  protected bindSession<T extends EventIndex, _typeonly = (typeof sessionEvents)[T]>(
     eventIndex: T,
     handler: MediaSessionActionHandler,
   ): void {
@@ -240,16 +263,10 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
   }
 
   public handleContext(
-    fn: (
-      ctx: AudioContext,
-      nodes: AudioNode[]
-    ) => AudioNode[] | undefined | void | null,
+    fn: (ctx: AudioContext, nodes: AudioNode[]) => AudioNode[] | undefined | void | null,
   ): void
   public handleContext(
-    fn: (
-      ctx: AudioContext,
-      nodes: AudioNode[]
-    ) => Promise<AudioNode[] | undefined | void | null>,
+    fn: (ctx: AudioContext, nodes: AudioNode[]) => Promise<AudioNode[] | undefined | void | null>,
   ): Promise<void>
   /**
    * Handle audio context and nodes. If return value is audio nodes, reconnect them to destination
@@ -260,22 +277,20 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
   public handleContext(
     fn: (
       ctx: AudioContext,
-      nodes: AudioNode[]
+      nodes: AudioNode[],
     ) => Promisable<AudioNode[] | undefined | void | null>,
   ): Promisable<void> {
     if (!this.ctx) {
       return
     }
 
-    const reconnectNodes = (
-      nodes: AudioNode[] | undefined | void | null,
-    ): void => {
+    const reconnectNodes = (nodes: AudioNode[] | undefined | void | null): void => {
       if (!nodes) {
         return
       }
 
       this.sourceNode!.disconnect()
-      this.nodes.forEach(node => node.disconnect())
+      this.nodes.forEach((node) => node.disconnect())
 
       if (!nodes.length) {
         this.sourceNode!.connect(this.gainNode!)
@@ -290,9 +305,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     }
 
     const result = fn(this.ctx, [...this.nodes])
-    return result instanceof Promise
-      ? result.then(reconnectNodes)
-      : reconnectNodes(result)
+    return result instanceof Promise ? result.then(reconnectNodes) : reconnectNodes(result)
   }
 
   /**
@@ -301,83 +314,106 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
    * @param options load options
    */
   public async load(metadata: ParsedTrackInfo, options: LoadOptions = {}): Promise<boolean> {
-    const autoPlay = options.autoPlay ?? this.isPlaying
+    const {
+      startTime,
+      mimeType,
+      autoPlay = this.isPlaying,
+      retryCount = this.options.retryCount,
+      retryDelay = this.options.retryDelay,
+    } = options
+
     if (this.isPlaying) {
       await this.stop()
     }
 
     const newSrc = metadata.src
-    const ext = newSrc.split('?', 1)[0].match(/\.([^.]+)$/)?.[1]
-      || options.mimeType?.split('/')[1]?.split(';')[0]
-      || newSrc.match(/^data:audio\/([^;]+);/i)?.[1]
+    const ext =
+      newSrc.split('?', 1)[0].match(/\.([^.]+)$/)?.[1] ||
+      mimeType?.split('/')[1]?.split(';')[0] ||
+      newSrc.match(/^data:audio\/([^;]+);/i)?.[1]
 
     if (!ext || !this.codecs.has(ext.toLowerCase())) {
       return this.emitError(`MIMETYPE ${ext} is unsupported`)
     }
 
     if (!this.ctx) {
-      this.ctx = this.options.getAudioContext()
-      this.gainNode = this.ctx.createGain()
-      this.gainNode.gain.setValueAtTime(this.volume, this.ctx.currentTime)
-      this.sourceNode = this.ctx.createMediaElementSource(this.audio)
-      this.gainNode.connect(this.ctx.destination)
-      this.handleContext((ctx) => {
-        const nodes = this.options.extraAudioNodes(ctx)
-        return Array.isArray(nodes) ? nodes : nodes()
-      })
-      this.setVolume(this.volume)
+      return this.emitError('Already destroyed')
     }
-    await this.ctx.suspend()
+
+    if (this.ctx.state !== 'running') {
+      await this.ctx.resume().catch(() => { })
+    }
 
     this.state = 'loading'
     this.isEnding = false
 
-    let _cleanup: VoidFunction | undefined
-    const loadResult = await new Promise<boolean>((resolve) => {
-      let _timeout = this.options.timeout
-      const timeoutId = setTimeout(() => {
-        _cleanup?.()
-        resolve(
-          this.emitError(`Loading audio ${newSrc} timeout after ${_timeout}ms`, 2),
-        )
-      }, _timeout)
-      const cleanup1 = bindEventListenerWithCleanup(this.audio, 'canplay', () => resolve(true))
-      const cleanup2 = bindEventListenerWithCleanup(this.audio, 'error', () => {
-        this.state = 'error'
-        resolve(
-          this.emitError(
-            this.audio.error?.message || 'Unknown audio error',
-            (this.audio.error?.code || 0) as ZAudioErrorCode,
-          ),
-        )
-      })
-      _cleanup = () => {
-        cleanup1()
-        cleanup2()
-        clearTimeout(timeoutId)
-      }
-      this.audio.src = newSrc
-      this.audio.crossOrigin = 'anonymous'
-      this.audio.load()
-    }).catch(e => this.emitError(e.toString(), 0))
-    _cleanup?.()
+    let lastError: { message: string; code: ZAudioErrorCode } | undefined
 
-    if (!loadResult) {
-      return false
-    }
-    this.emit('load', metadata)
-
-    if (this.ses) {
-      this.ses.metadata = new MediaMetadata(metadata)
-    }
-    this.state = 'loaded'
-    if (autoPlay) {
-      if (options.startTime) {
-        await this.seek(options.startTime)
+    for (let attempt = 0; attempt <= retryCount; attempt++) {
+      if (attempt > 0) {
+        await sleep(retryDelay)
       }
-      return await this.play()
+
+      let _cleanup: VoidFunction | undefined
+      const loadResult = await new Promise<boolean>((resolve) => {
+        let _timeout = this.options.timeout
+        const timeoutId = setTimeout(() => {
+          _cleanup?.()
+          lastError = { message: `Loading audio ${newSrc} timeout after ${_timeout}ms`, code: 2 }
+          if (attempt < retryCount) {
+            resolve(false)
+          } else {
+            resolve(this.emitError(lastError.message, lastError.code))
+          }
+        }, _timeout)
+        const cleanup1 = bindEventListenerWithCleanup(this.audio, 'canplay', () => resolve(true))
+        const cleanup2 = bindEventListenerWithCleanup(this.audio, 'error', () => {
+          this.state = 'error'
+          const errorCode = (this.audio.error?.code || 0) as ZAudioErrorCode
+          const errorMessage = this.audio.error?.message || 'Unknown audio error'
+          lastError = { message: errorMessage, code: errorCode }
+          // Network errors: code 2 (MEDIA_ERR_NETWORK)
+          const isNetworkError = errorCode === 2
+          if (isNetworkError && attempt < retryCount) {
+            resolve(false)
+          } else {
+            resolve(this.emitError(errorMessage, errorCode))
+          }
+        })
+        _cleanup = () => {
+          cleanup1()
+          cleanup2()
+          clearTimeout(timeoutId)
+        }
+        this.audio.src = newSrc
+        this.audio.crossOrigin = 'anonymous'
+        this.audio.load()
+      }).catch((e) => this.emitError(e.toString(), 0))
+      _cleanup?.()
+
+      if (loadResult) {
+        this.emit('load', metadata)
+
+        if (this.ses) {
+          this.ses.metadata = new MediaMetadata(metadata)
+        }
+        this.state = 'loaded'
+        if (autoPlay) {
+          if (startTime) {
+            await this.seek(startTime)
+          }
+          return await this.play()
+        }
+        return loadResult
+      }
+
+      // If it's not a network error, don't retry
+      if (lastError && lastError.code !== 2) {
+        break
+      }
     }
-    return loadResult
+
+    return false
   }
 
   /**
@@ -387,21 +423,24 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     if (this.isPlaying) {
       return true
     }
-    if (!this.ctx || this.state !== 'loaded') {
+    if (!this.ctx || this.ctx.state === 'closed' || this.state !== 'loaded') {
       return false
     }
     try {
-      if (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted') {
+      // Resume AudioContext if suspended
+      if (this.ctx.state !== 'running') {
         await this.ctx.resume()
       }
+
       this.isEnding = false
-      this.setVolume(0)
+
       if (this.ses) {
         this.ses.playbackState = 'playing'
       }
+
       await this.audio.play()
       this.emit('play')
-      await this.fade(0, this.volume)
+      await this.fade(this.volume)
       return true
     } catch (e) {
       return this.emitError(`Failed to play audio, ${e}`)
@@ -415,11 +454,13 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     if (!this.isPlaying) {
       return
     }
-    await this.fade(this.volume, 0)
+
+    await this.fade(0)
+
     if (this.ses) {
       this.ses.playbackState = 'paused'
     }
-    await this.ctx?.suspend()
+
     this.audio.pause()
     this.emit('pause')
   }
@@ -429,10 +470,17 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
    */
   public async stop(): Promise<void> {
     await this.pause()
+
+    // Suspend context to save resources
+    if (this.ctx && this.ctx.state === 'running') {
+      await this.ctx.suspend()
+    }
+
     this.audio.currentTime = 0
     if (this.ses) {
       this.ses.playbackState = 'none'
     }
+    // Clear src to stop any ongoing downloads
     this.audio.src = ''
     this.audio.load()
     this.state = 'empty'
@@ -444,35 +492,39 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
    */
   public async seek(time: number): Promise<void> {
     time = clamp(0, time, this.duration)
+
     if (!this.isPlaying) {
       this.audio.currentTime = time
+      this.emit('seek', time)
       return
     }
+
     const vol = this.volume
     const dur = this.fadeDuration / 2
-    await this.fade(vol, vol / 2, dur)
+
+    await this.fade(vol / 2, dur)
     this.audio.currentTime = time
     this.emit('seek', time)
-    await this.fade(vol / 2, vol, dur)
+    await this.fade(vol, dur)
   }
 
   /**
    * Fade audio's volume
    */
-  public async fade(
-    from: number,
-    to: number,
-    fadeDuration: number = this.fadeDuration,
-  ): Promise<void> {
-    if (fadeDuration <= 0) {
+  public async fade(to: number, fadeDuration: number = this.fadeDuration): Promise<void> {
+    if (fadeDuration <= 0 || !this.gainNode || !this.ctx) {
       this.setVolume(to)
       return
     }
-    const currentTime = this.setVolume(formatVolume(from))
-    this.gainNode?.gain.linearRampToValueAtTime(
-      formatVolume(to),
-      currentTime + fadeDuration / 1e3,
-    )
+
+    const currentTime = this.ctx.currentTime
+    this.gainNode.gain
+      // Cancel any existing scheduled fades and set current value
+      .cancelScheduledValues(currentTime)
+      // Schedule the fade in the audio graph
+      .setValueCurveAtTime([this.gainNode.gain.value, formatVolume(to)], currentTime, fadeDuration / 1e3)
+
+    // Wait for fade to complete
     await sleep(fadeDuration)
   }
 
@@ -480,19 +532,76 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
    * Destroy instance
    */
   public async destroy(): Promise<void> {
-    await this.pause()
+    await this.stop()
     await this.ctx?.close()
     if (this.ses) {
       this.ses.playbackState = 'none'
-      sessionEvents.forEach(e => this.ses!.setActionHandler(e, null))
+      sessionEvents.forEach((e) => this.ses!.setActionHandler(e, null))
     }
-    this.cleanup.forEach(c => c())
+    this.cleanup.forEach((c) => c())
     this.cleanup = null!
-    this.nodes?.forEach(n => n.disconnect())
+    this.nodes?.forEach((n) => {
+      try {
+        n.disconnect()
+      } catch { }
+    })
     this.nodes = null!
     this.audio = null!
     this.ctx = null!
     this.gainNode = null!
     this.off()
+  }
+
+  /**
+   * Setup auto unlock for mobile browsers
+   */
+  private setupAutoUnlock(): void {
+    if (this.audioUnlocked || typeof document === 'undefined') {
+      return
+    }
+
+    const unlock = () => {
+      if (this.audioUnlocked) {
+        return
+      }
+
+      if (this.ctx!.state === 'suspended') {
+        this.ctx!.resume()
+          .then(() => {
+            this.audioUnlocked = true
+            this.removeUnlockListeners()
+          })
+          .catch(() => {
+            // Retry on next interaction
+          })
+      } else {
+        this.audioUnlocked = true
+        this.removeUnlockListeners()
+      }
+    }
+
+    // Listen for user interactions with capture phase
+    const cleanup1 = bindEventListenerWithCleanup(document, 'touchstart', unlock, true)
+    const cleanup2 = bindEventListenerWithCleanup(document, 'touchend', unlock, true)
+    const cleanup3 = bindEventListenerWithCleanup(document, 'click', unlock, true)
+    const cleanup4 = bindEventListenerWithCleanup(document, 'keydown', unlock, true)
+
+    // Store combined cleanup function
+    this.unlockCleanup = () => {
+      cleanup1()
+      cleanup2()
+      cleanup3()
+      cleanup4()
+    }
+  }
+
+  /**
+   * Remove unlock event listeners
+   */
+  private removeUnlockListeners(): void {
+    if (this.unlockCleanup) {
+      this.unlockCleanup()
+      this.unlockCleanup = undefined
+    }
   }
 }
