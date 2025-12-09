@@ -23,7 +23,13 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
   private streamCleanup?: () => void
 
   constructor(config: ZPlayerOptions = {}) {
-    const { autoNext, trackList, shuffleFn = defaultShuffle, loopMode = 'list', ...audioConfig } = config
+    const {
+      autoNext,
+      trackList,
+      shuffleFn = defaultShuffle,
+      loopMode = 'list',
+      ...audioConfig
+    } = config
     super(audioConfig)
     this.bindSession(3, () => this.prevTrack())
     this.bindSession(0, () => this.nextTrack())
@@ -42,7 +48,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
   }
 
   get trackList(): TrackLike[] {
-    return this._orderList.map(i => this._trackList[i])
+    return this._orderList.map((i) => this._trackList[i])
   }
 
   set trackList(list: TrackLike[]) {
@@ -129,10 +135,8 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
 
     switch (track.type) {
       case 'stream': {
-        const [src, cleanup] = useStream(
-          await track.src(),
-          mimeType,
-          err => this.emitError(err, 5),
+        const [src, cleanup] = useStream(await track.src(), mimeType, (err) =>
+          this.emitError(err, 5),
         )
         this.streamCleanup = cleanup
         info = { ...track, src }

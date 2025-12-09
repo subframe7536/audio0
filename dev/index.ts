@@ -15,12 +15,12 @@ const player = new ZPlayer({
   trackList: [
     { src: ogg },
     {
-      src: () => fetch(mp3).then(r => r.arrayBuffer()),
+      src: () => fetch(mp3).then((r) => r.arrayBuffer()),
       mimeType: 'audio/mpeg',
       type: 'buffer',
     },
     {
-      src: () => fetch(mp3).then(r => r.body!),
+      src: () => fetch(mp3).then((r) => r.body!),
       mimeType: 'audio/mpeg',
       type: 'stream',
     },
@@ -28,9 +28,9 @@ const player = new ZPlayer({
   autoNext: true,
 })
 
-player.on('timeupdate', (time) => {
-  player.handleContext(ctx => console.log(time, ctx.currentTime, player.duration))
-})
+// player.on('timeupdate', (time) => {
+//   console.log(time)
+// })
 
 player.on('error', (err) => {
   console.error(err)
@@ -40,8 +40,8 @@ player.on('reorder', () => console.log('reorder'))
 player.on('load', (data) => {
   console.log(data)
   fetch(data.src)
-    .then(res => res.arrayBuffer())
-    .then(data => new OfflineAudioContext({ length: 1, sampleRate: 44100 }).decodeAudioData(data))
+    .then((res) => res.arrayBuffer())
+    .then((data) => new OfflineAudioContext({ length: 1, sampleRate: 44100 }).decodeAudioData(data))
     .then((buffer) => {
       console.time('parseAudioBuffer')
       let arr

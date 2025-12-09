@@ -13,19 +13,18 @@ export function getCodecs(): Codecs {
   const mpegTest = checkAudioMime('mpeg')
   const aacTest = checkAudioMime('aac')
   const resultSet: Codecs = new Set(
-    Object
-      .entries({
-        mp3: mpegTest || checkAudioMime('mp3'),
-        mpeg: mpegTest,
-        opus: checkAudioMime('ogg;codecs="opus"'),
-        ogg: checkAudioMime('ogg;codecs="vorbis"'),
-        aac: aacTest,
-        m4a: checkAudioMime('x-m4a') || checkAudioMime('m4a') || aacTest,
-        mp4: checkAudioMime('x-mp4') || checkAudioMime('mp4') || aacTest,
-        webm: !isOldSafari && checkAudioMime('webm;codecs="vorbis"'),
-        wav: checkAudioMime('wav;codecs="1"') || checkAudioMime('wav'),
-        flac: checkAudioMime('x-flac') || checkAudioMime('flac'),
-      })
+    Object.entries({
+      mp3: mpegTest || checkAudioMime('mp3'),
+      mpeg: mpegTest,
+      opus: checkAudioMime('ogg;codecs="opus"'),
+      ogg: checkAudioMime('ogg;codecs="vorbis"'),
+      aac: aacTest,
+      m4a: checkAudioMime('x-m4a') || checkAudioMime('m4a') || aacTest,
+      mp4: checkAudioMime('x-mp4') || checkAudioMime('mp4') || aacTest,
+      webm: !isOldSafari && checkAudioMime('webm;codecs="vorbis"'),
+      wav: checkAudioMime('wav;codecs="1"') || checkAudioMime('wav'),
+      flac: checkAudioMime('x-flac') || checkAudioMime('flac'),
+    })
       .filter(([_, value]) => value)
       .map(([key]) => key),
   )
@@ -39,16 +38,17 @@ export function bindEventListenerWithCleanup(
   el: EventTarget,
   type: string,
   handler: EventListener,
+  options?: boolean | AddEventListenerOptions,
 ): VoidFunction {
-  el.addEventListener(type, handler)
-  return () => el.removeEventListener(type, handler)
+  el.addEventListener(type, handler, options)
+  return () => el.removeEventListener(type, handler, options)
 }
 export function clamp(min: number, val: number, max: number): number {
   return Math.min(Math.max(min, val), max)
 }
 
 export function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 export function formatVolume(val: number): number {
@@ -60,9 +60,12 @@ export function padStartZero(num: number, length = 2): string {
 }
 
 export function secondToTime(second: number): string {
-  return (second < 3600 ? '' : padStartZero(second / 3600) + ':')
-    + padStartZero((second / 60) % 60) + ':'
-    + padStartZero(second % 60)
+  return (
+    (second < 3600 ? '' : padStartZero(second / 3600) + ':') +
+    padStartZero((second / 60) % 60) +
+    ':' +
+    padStartZero(second % 60)
+  )
 }
 
 /**
@@ -100,7 +103,7 @@ export function normalizeAudioBuffer(
 
   // use fori to avoid array copy
   for (let i = 0; i < blockNum; i++) {
-    result[i] = Math.round(Math.max(result[i] * max / tempMax, min) * 1e5) / 1e5
+    result[i] = Math.round(Math.max((result[i] * max) / tempMax, min) * 1e5) / 1e5
   }
   return result
 }

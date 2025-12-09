@@ -10,12 +10,12 @@
  * cleanup()
  * ```
  */
-export function useArrayBuffer(buf: ArrayBuffer, type: string): [url: string, cleanup: VoidFunction] {
+export function useArrayBuffer(
+  buf: ArrayBuffer,
+  type: string,
+): [url: string, cleanup: VoidFunction] {
   const blob = new Blob([buf], { type })
   const url = URL.createObjectURL(blob)
 
-  return [
-    url,
-    () => URL.revokeObjectURL(url),
-  ]
+  return [url, () => URL.revokeObjectURL(url)]
 }

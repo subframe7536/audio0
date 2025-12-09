@@ -32,7 +32,7 @@ type GetLimitFn = (totalArtists: number) => number
  * @param getLimit get limit function. The larger of result, the more shuffled, the poor performance, @default n => n * 2 / 3
  */
 export function createWeightedArtistShuffle(
-  getLimit: GetLimitFn = n => n * 2 / 3,
+  getLimit: GetLimitFn = (n) => (n * 2) / 3,
 ): ShuffleIndexFn {
   return (songs: TrackInfo[]) => {
     const artistMap = new Map<string, [number, number][]>()
@@ -71,7 +71,11 @@ export function createWeightedArtistShuffle(
 
         for (let i = windowStart; i <= windowEnd; i++) {
           let minDistance = i === result.length ? i : Infinity
-          for (let j = Math.max(0, i - windowSize); j < Math.min(result.length, i + windowSize); j++) {
+          for (
+            let j = Math.max(0, i - windowSize);
+            j < Math.min(result.length, i + windowSize);
+            j++
+          ) {
             if (songs[result[j]].artist === artist) {
               minDistance = Math.min(minDistance, Math.abs(i - j))
             }
