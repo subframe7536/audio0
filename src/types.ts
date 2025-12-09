@@ -106,6 +106,16 @@ export interface ZAudioOptions extends RetryOptions {
    * @default true
    */
   autoUnlock?: boolean
+  /**
+   * Enable auto suspend audio context when paused
+   * @default false
+   */
+  autoSuspend?: boolean
+  /**
+   * Delay before auto suspending audio context in milliseconds
+   * @default 30000
+   */
+  autoSuspendDelay?: number
 }
 
 export interface ZPlayerOptions extends ZAudioOptions {

@@ -65,6 +65,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
   private nodes: AudioNode[] = []
   private unlockCleanup?: () => void
   private audioUnlocked: boolean = false
+  private autoSuspendTimer: ReturnType<typeof setTimeout> | undefined
   protected cleanup: VoidFunction[] = []
   protected isEnding = false
   protected options: Required<Omit<ZAudioOptions, 'mediaSession'>>
@@ -82,6 +83,8 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
       retryCount: 3,
       retryDelay: 1000,
       autoUnlock: true,
+      autoSuspend: false,
+      autoSuspendDelay: 30000,
       // @ts-expect-error polyfill
       getAudioContext: () => new (globalThis.AudioContext || globalThis.webkitAudioContext)(),
       extraAudioNodes: () => [],
@@ -341,7 +344,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     }
 
     if (this.ctx.state !== 'running') {
-      await this.ctx.resume().catch(() => { })
+      await this.ctx.resume()
     }
 
     this.state = 'loading'
@@ -423,6 +426,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     if (this.isPlaying) {
       return true
     }
+    this.clearAutoSuspend()
     if (!this.ctx || this.ctx.state === 'closed' || this.state !== 'loaded') {
       return false
     }
@@ -463,12 +467,14 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
 
     this.audio.pause()
     this.emit('pause')
+    this.scheduleAutoSuspend()
   }
 
   /**
    * Stop audio
    */
   public async stop(): Promise<void> {
+    this.clearAutoSuspend()
     await this.pause()
 
     // Suspend context to save resources
@@ -522,7 +528,11 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
       // Cancel any existing scheduled fades and set current value
       .cancelScheduledValues(currentTime)
       // Schedule the fade in the audio graph
-      .setValueCurveAtTime([this.gainNode.gain.value, formatVolume(to)], currentTime, fadeDuration / 1e3)
+      .setValueCurveAtTime(
+        [this.gainNode.gain.value, formatVolume(to)],
+        currentTime,
+        fadeDuration / 1e3,
+      )
 
     // Wait for fade to complete
     await sleep(fadeDuration)
@@ -532,6 +542,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
    * Destroy instance
    */
   public async destroy(): Promise<void> {
+    this.clearAutoSuspend()
     await this.stop()
     await this.ctx?.close()
     if (this.ses) {
@@ -543,7 +554,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     this.nodes?.forEach((n) => {
       try {
         n.disconnect()
-      } catch { }
+      } catch {}
     })
     this.nodes = null!
     this.audio = null!
@@ -602,6 +613,30 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     if (this.unlockCleanup) {
       this.unlockCleanup()
       this.unlockCleanup = undefined
+    }
+  }
+
+  /**
+   * Schedule auto suspend of audio context after delay
+   */
+  private scheduleAutoSuspend(): void {
+    this.clearAutoSuspend()
+    if (this.options.autoSuspend && this.ctx && this.ctx.state !== 'closed') {
+      this.autoSuspendTimer = setTimeout(async () => {
+        if (this.ctx && this.ctx.state === 'running' && !this.isPlaying) {
+          await this.ctx.suspend()
+        }
+      }, this.options.autoSuspendDelay)
+    }
+  }
+
+  /**
+   * Clear auto suspend timer
+   */
+  private clearAutoSuspend(): void {
+    if (this.autoSuspendTimer) {
+      clearTimeout(this.autoSuspendTimer)
+      this.autoSuspendTimer = undefined
     }
   }
 }
