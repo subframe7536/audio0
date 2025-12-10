@@ -11,7 +11,7 @@ interface EQ<T extends readonly number[]> {
  * @param freq frequency array, you can use {@link defaultFreq}
  * @param handleNode biquad filter node handler
  * @example
- * const eq = createEqualizer(ctx, defaultFeq)
+ * const eq = createEqualizer(ctx, defaultFreq)
  * const eq1 = createEqualizer(ctx, [100, 200, 300, 400, 500] as const)
  */
 export function createEqualizer<T extends readonly number[] | number[]>(
@@ -41,7 +41,10 @@ export function createEqualizer<T extends readonly number[] | number[]>(
   return {
     nodes: () => result,
     handle: (targetFreq: T[number], fn: (band: BiquadFilterNode) => void) => {
-      fn(result[freq.indexOf(targetFreq)])
+      const index = freq.indexOf(targetFreq)
+      if (index !== -1) {
+        fn(result[index])
+      }
     },
   }
 }
