@@ -152,7 +152,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
         info = track
       }
     }
-    const result = await super.load(info, { mimeType, ...options })
+    const result = await this.load(info, { mimeType, ...options })
     if (result) {
       this.emit('loadTrack', this.currentIndex, info)
     }

@@ -59,15 +59,15 @@ type EventIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
  * @event seek - Emitted when seeking to a specific time
  */
 export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
-  private ctx: AudioContext | undefined
-  private sourceNode: MediaElementAudioSourceNode | undefined
-  private gainNode: GainNode | undefined
-  private nodes: AudioNode[] = []
-  private unlockCleanup?: () => void
-  private audioUnlocked: boolean = false
-  private autoSuspendTimer: ReturnType<typeof setTimeout> | undefined
+  private _unlockCleanup?: () => void
+  private _audioUnlocked: boolean = false
+  private _autoSuspendTimer: ReturnType<typeof setTimeout> | undefined
+  private _isEnding = false
+  protected ctx: AudioContext | undefined
+  protected sourceNode: MediaElementAudioSourceNode | undefined
+  protected gainNode: GainNode | undefined
+  protected nodes: AudioNode[] = []
   protected cleanup: VoidFunction[] = []
-  protected isEnding = false
   protected options: Required<Omit<ZAudioOptions, 'mediaSession'>>
   protected ses: MediaSession | undefined
   public codecs: Codecs
@@ -114,10 +114,10 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
       })
 
       this.emit('timeupdate', this.currentTime)
-      if (this.fadeDuration > 0 && !this.isEnding) {
+      if (this.fadeDuration > 0 && !this._isEnding) {
         const targetFadeDuration = (this.duration - this.currentTime) * 1e3
         if (targetFadeDuration < this.fadeDuration) {
-          this.isEnding = true
+          this._isEnding = true
           void this.fade(0, targetFadeDuration)
         }
       }
@@ -132,10 +132,10 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
       const nodes = this.options.extraAudioNodes(ctx)
       return Array.isArray(nodes) ? nodes : nodes()
     })
-    this.setVolume(this.volume)
+    this._vol(this.volume)
 
     if (this.options.autoUnlock) {
-      this.setupAutoUnlock()
+      this._setupAutoUnlock()
     }
   }
 
@@ -198,7 +198,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
   set volume(volume: number) {
     volume = formatVolume(volume)
     this.options.volume = volume
-    this.setVolume(volume)
+    this._vol(volume)
     this.emit('volume', volume)
   }
 
@@ -235,12 +235,6 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
   set fadeDuration(duration: number) {
     this.options.fadeDuration = duration
     this.emit('fadeDuration', duration)
-  }
-
-  private setVolume(v: number): number {
-    const currentTime = this.ctx!.currentTime
-    this.gainNode!.gain.cancelScheduledValues(currentTime).setValueAtTime(v, currentTime)
-    return currentTime
   }
 
   protected emitError(msg: string, code: ZAudioErrorCode = -1): false {
@@ -348,7 +342,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     }
 
     this.state = 'loading'
-    this.isEnding = false
+    this._isEnding = false
 
     let lastError: { message: string; code: ZAudioErrorCode } | undefined
 
@@ -426,7 +420,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     if (this.isPlaying) {
       return true
     }
-    this.clearAutoSuspend()
+    this._clearAutoSuspend()
     if (!this.ctx || this.ctx.state === 'closed' || this.state !== 'loaded') {
       return false
     }
@@ -436,7 +430,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
         await this.ctx.resume()
       }
 
-      this.isEnding = false
+      this._isEnding = false
 
       if (this.ses) {
         this.ses.playbackState = 'playing'
@@ -467,14 +461,14 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
 
     this.audio.pause()
     this.emit('pause')
-    this.scheduleAutoSuspend()
+    this._autoSuspend()
   }
 
   /**
    * Stop audio
    */
   public async stop(): Promise<void> {
-    this.clearAutoSuspend()
+    this._clearAutoSuspend()
     await this.pause()
 
     // Suspend context to save resources
@@ -519,7 +513,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
    */
   public async fade(to: number, fadeDuration: number = this.fadeDuration): Promise<void> {
     if (fadeDuration <= 0 || !this.gainNode || !this.ctx) {
-      this.setVolume(to)
+      this._vol(to)
       return
     }
 
@@ -542,7 +536,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
    * Destroy instance
    */
   public async destroy(): Promise<void> {
-    this.clearAutoSuspend()
+    this._clearAutoSuspend()
     await this.stop()
     await this.ctx?.close()
     if (this.ses) {
@@ -564,30 +558,39 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
   }
 
   /**
+   * Update volume internally
+   */
+  private _vol(v: number): number {
+    const currentTime = this.ctx!.currentTime
+    this.gainNode!.gain.cancelScheduledValues(currentTime).setValueAtTime(v, currentTime)
+    return currentTime
+  }
+
+  /**
    * Setup auto unlock for mobile browsers
    */
-  private setupAutoUnlock(): void {
-    if (this.audioUnlocked || typeof document === 'undefined') {
+  private _setupAutoUnlock(): void {
+    if (this._audioUnlocked || typeof document === 'undefined') {
       return
     }
 
     const unlock = () => {
-      if (this.audioUnlocked) {
+      if (this._audioUnlocked) {
         return
       }
 
       if (this.ctx!.state === 'suspended') {
         this.ctx!.resume()
           .then(() => {
-            this.audioUnlocked = true
-            this.removeUnlockListeners()
+            this._audioUnlocked = true
+            this._clearUnlock()
           })
           .catch(() => {
             // Retry on next interaction
           })
       } else {
-        this.audioUnlocked = true
-        this.removeUnlockListeners()
+        this._audioUnlocked = true
+        this._clearUnlock()
       }
     }
 
@@ -598,7 +601,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     const cleanup4 = bindEventListenerWithCleanup(document, 'keydown', unlock, true)
 
     // Store combined cleanup function
-    this.unlockCleanup = () => {
+    this._unlockCleanup = () => {
       cleanup1()
       cleanup2()
       cleanup3()
@@ -609,20 +612,20 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
   /**
    * Remove unlock event listeners
    */
-  private removeUnlockListeners(): void {
-    if (this.unlockCleanup) {
-      this.unlockCleanup()
-      this.unlockCleanup = undefined
+  private _clearUnlock(): void {
+    if (this._unlockCleanup) {
+      this._unlockCleanup()
+      this._unlockCleanup = undefined
     }
   }
 
   /**
    * Schedule auto suspend of audio context after delay
    */
-  private scheduleAutoSuspend(): void {
-    this.clearAutoSuspend()
+  private _autoSuspend(): void {
+    this._clearAutoSuspend()
     if (this.options.autoSuspend && this.ctx && this.ctx.state !== 'closed') {
-      this.autoSuspendTimer = setTimeout(async () => {
+      this._autoSuspendTimer = setTimeout(async () => {
         if (this.ctx && this.ctx.state === 'running' && !this.isPlaying) {
           await this.ctx.suspend()
         }
@@ -633,10 +636,10 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
   /**
    * Clear auto suspend timer
    */
-  private clearAutoSuspend(): void {
-    if (this.autoSuspendTimer) {
-      clearTimeout(this.autoSuspendTimer)
-      this.autoSuspendTimer = undefined
+  private _clearAutoSuspend(): void {
+    if (this._autoSuspendTimer) {
+      clearTimeout(this._autoSuspendTimer)
+      this._autoSuspendTimer = undefined
     }
   }
 }
