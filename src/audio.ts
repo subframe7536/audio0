@@ -107,18 +107,20 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     )
     this.bindListener('ended', () => this.emit('ended'))
     this.bindListener('timeupdate', () => {
-      this.ses?.setPositionState?.({
-        duration: this.duration,
-        position: this.currentTime,
-        playbackRate: this.playbackRate,
-      })
-
       this.emit('timeupdate', this.currentTime)
-      if (this.fadeDuration > 0 && !this._isEnding) {
-        const targetFadeDuration = (this.duration - this.currentTime) * 1e3
-        if (targetFadeDuration < this.fadeDuration) {
-          this._isEnding = true
-          void this.fade(0, targetFadeDuration)
+
+      if (!Number.isNaN(this.duration)) {
+        this.ses?.setPositionState?.({
+          duration: this.duration,
+          position: this.currentTime,
+          playbackRate: this.playbackRate,
+        })
+        if (this.fadeDuration > 0 && !this._isEnding) {
+          const targetFadeDuration = (this.duration - this.currentTime) * 1e3
+          if (targetFadeDuration < this.fadeDuration) {
+            this._isEnding = true
+            void this.fade(0, targetFadeDuration)
+          }
         }
       }
     })
