@@ -118,6 +118,19 @@ export interface ZAudioOptions extends RetryOptions {
   autoSuspendDelay?: number
 }
 
+export interface PreloadConfig {
+  /**
+   * Enable preload
+   * @default true
+   */
+  enable: boolean
+  /**
+   * Percentage of track duration to trigger preload (0-100)
+   * @default 80
+   */
+  threshold: number
+}
+
 export interface ZPlayerOptions extends ZAudioOptions {
   /**
    * track list
@@ -136,6 +149,11 @@ export interface ZPlayerOptions extends ZAudioOptions {
    * Loop mode
    */
   loopMode?: LoopMode
+  /**
+   * Preload threshold
+   * @default 80
+   */
+  preload?: boolean | PreloadConfig
 }
 
 export interface LoadOptions extends RetryOptions {

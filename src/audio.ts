@@ -237,9 +237,15 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     this.emit('fadeDuration', duration)
   }
 
-  protected emitError(msg: string, code: ZAudioErrorCode = -1): false {
+  protected emitError(error: ZAudioError): false
+  protected emitError(msg: string, code?: ZAudioErrorCode): false
+  protected emitError(data: string | ZAudioError, code?: ZAudioErrorCode): false {
     this.state = 'error'
-    this.emit('error', new ZAudioError(code, msg), code)
+    if (data instanceof ZAudioError) {
+      this.emit('error', data, data.code)
+    } else {
+      this.emit('error', new ZAudioError(code!, data), code!)
+    }
     return false
   }
 
@@ -257,6 +263,91 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
    */
   protected bindListener(event: keyof HTMLMediaElementEventMap, handler: EventListener): void {
     this.cleanup.push(bindEventListenerWithCleanup(this.audio, event, handler))
+  }
+
+  /**
+   * Load audio with retry logic
+   * @param src audio source URL
+   * @param retryCount number of retry attempts
+   * @param retryDelay delay between retries in milliseconds
+   */
+  protected async loadAudioWithRetry(
+    audio: HTMLAudioElement,
+    src: string,
+    retry: {
+      count?: number
+      delay?: number
+    } = {},
+  ): Promise<boolean> {
+    let lastError: { message: string; code: ZAudioErrorCode } | undefined
+    const { count = this.options.retryCount, delay = this.options.retryDelay } = retry
+
+    for (let attempt = 0; attempt <= count; attempt++) {
+      if (attempt > 0) {
+        await sleep(delay)
+      }
+
+      let _cleanup: VoidFunction | undefined
+      const loadResult = await new Promise<boolean>((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          _cleanup?.()
+          lastError = {
+            message: `Loading audio ${src} timeout after ${this.options.timeout}ms`,
+            code: 2,
+          }
+          if (attempt < count) {
+            resolve(false)
+          } else {
+            reject(new ZAudioError(lastError.code, lastError.message))
+          }
+        }, this.options.timeout)
+        const cleanup1 = bindEventListenerWithCleanup(audio, 'canplay', () => resolve(true))
+        const cleanup2 = bindEventListenerWithCleanup(audio, 'error', () => {
+          const errorCode = (audio.error?.code || 0) as ZAudioErrorCode
+          const errorMessage = audio.error?.message || 'Unknown audio error'
+          lastError = { message: errorMessage, code: errorCode }
+          // Network errors: code 2 (MEDIA_ERR_NETWORK)
+          const isNetworkError = errorCode === 2
+          if (isNetworkError && attempt < count) {
+            resolve(false)
+          } else {
+            reject(new ZAudioError(errorCode, errorMessage))
+          }
+        })
+        _cleanup = () => {
+          cleanup1()
+          cleanup2()
+          clearTimeout(timeoutId)
+        }
+        audio.src = src
+        audio.crossOrigin = 'anonymous'
+        audio.load()
+      }).catch((e) =>
+        this.emitError(
+          e instanceof ZAudioError ? e : new ZAudioError(-1, 'Unknown load error: ' + e),
+        ),
+      )
+      _cleanup?.()
+
+      if (loadResult) {
+        return loadResult
+      }
+
+      // If it's not a network error, don't retry
+      if (lastError && lastError.code !== 2) {
+        break
+      }
+    }
+
+    return false
+  }
+
+  protected extractExt(newSrc: string, mimeType?: string): string | undefined {
+    return (
+      newSrc.split('?', 1)[0].match(/\.([^.]+)$/)?.[1] ||
+      mimeType?.split('/')[1]?.split(';')[0] ||
+      newSrc.match(/^data:audio\/([^;]+);/i)?.[1]
+    )
   }
 
   public handleContext(
@@ -311,23 +402,13 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
    * @param options load options
    */
   public async load(metadata: ParsedTrackInfo, options: LoadOptions = {}): Promise<boolean> {
-    const {
-      startTime,
-      mimeType,
-      autoPlay = this.isPlaying,
-      retryCount = this.options.retryCount,
-      retryDelay = this.options.retryDelay,
-    } = options
-
+    const autoPlay = options.autoPlay ?? this.isPlaying
     if (this.isPlaying) {
       await this.stop()
     }
 
     const newSrc = metadata.src
-    const ext =
-      newSrc.split('?', 1)[0].match(/\.([^.]+)$/)?.[1] ||
-      mimeType?.split('/')[1]?.split(';')[0] ||
-      newSrc.match(/^data:audio\/([^;]+);/i)?.[1]
+    const ext = this.extractExt(newSrc, options.mimeType)
 
     if (!ext || !this.codecs.has(ext.toLowerCase())) {
       return this.emitError(`MIMETYPE ${ext} is unsupported`)
@@ -344,70 +425,25 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     this.state = 'loading'
     this._isEnding = false
 
-    let lastError: { message: string; code: ZAudioErrorCode } | undefined
+    const loadResult = await this.loadAudioWithRetry(this.audio, newSrc, {
+      count: options.retryCount,
+      delay: options.retryDelay,
+    })
 
-    for (let attempt = 0; attempt <= retryCount; attempt++) {
-      if (attempt > 0) {
-        await sleep(retryDelay)
+    if (loadResult) {
+      this.emit('load', metadata)
+
+      if (this.ses) {
+        this.ses.metadata = new MediaMetadata(metadata)
       }
-
-      let _cleanup: VoidFunction | undefined
-      const loadResult = await new Promise<boolean>((resolve) => {
-        let _timeout = this.options.timeout
-        const timeoutId = setTimeout(() => {
-          _cleanup?.()
-          lastError = { message: `Loading audio ${newSrc} timeout after ${_timeout}ms`, code: 2 }
-          if (attempt < retryCount) {
-            resolve(false)
-          } else {
-            resolve(this.emitError(lastError.message, lastError.code))
-          }
-        }, _timeout)
-        const cleanup1 = bindEventListenerWithCleanup(this.audio, 'canplay', () => resolve(true))
-        const cleanup2 = bindEventListenerWithCleanup(this.audio, 'error', () => {
-          this.state = 'error'
-          const errorCode = (this.audio.error?.code || 0) as ZAudioErrorCode
-          const errorMessage = this.audio.error?.message || 'Unknown audio error'
-          lastError = { message: errorMessage, code: errorCode }
-          // Network errors: code 2 (MEDIA_ERR_NETWORK)
-          const isNetworkError = errorCode === 2
-          if (isNetworkError && attempt < retryCount) {
-            resolve(false)
-          } else {
-            resolve(this.emitError(errorMessage, errorCode))
-          }
-        })
-        _cleanup = () => {
-          cleanup1()
-          cleanup2()
-          clearTimeout(timeoutId)
+      this.state = 'loaded'
+      if (autoPlay) {
+        if (options.startTime) {
+          await this.seek(options.startTime)
         }
-        this.audio.src = newSrc
-        this.audio.crossOrigin = 'anonymous'
-        this.audio.load()
-      }).catch((e) => this.emitError(e.toString(), 0))
-      _cleanup?.()
-
-      if (loadResult) {
-        this.emit('load', metadata)
-
-        if (this.ses) {
-          this.ses.metadata = new MediaMetadata(metadata)
-        }
-        this.state = 'loaded'
-        if (autoPlay) {
-          if (startTime) {
-            await this.seek(startTime)
-          }
-          return await this.play()
-        }
-        return loadResult
+        return await this.play()
       }
-
-      // If it's not a network error, don't retry
-      if (lastError && lastError.code !== 2) {
-        break
-      }
+      return loadResult
     }
 
     return false

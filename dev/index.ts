@@ -26,6 +26,10 @@ const player = new ZPlayer({
     },
   ],
   autoNext: true,
+  preload: {
+    enable: true,
+    threshold: 0,
+  },
 })
 
 // player.on('timeupdate', (time) => {
