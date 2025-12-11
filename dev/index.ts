@@ -453,10 +453,21 @@ function initEqualizerDemo() {
 
     if (isEnabled) {
       // Create equalizer and connect to current audio
+      const sliderList = Array.from(sliders)
       const currentAudio = state.player || state.singleAudio
       if (currentAudio) {
         currentAudio.handleContext((ctx) => {
-          state.equalizer = createEqualizer(ctx, [60, 250, 1000, 4000, 16000])
+          state.equalizer = createEqualizer(ctx, [60, 250, 1000, 4000, 16000], (band, freq) => {
+            // Find the slider for this frequency and apply its current value
+            const slider = sliderList.find((s) => parseInt(s.dataset.freq!) === freq)
+            if (slider) {
+              const gain = parseFloat(slider.value)
+              band.gain.value = gain
+            } else {
+              band.gain.value = 0 // Default to 0dB if no slider found
+            }
+          })
+
           status.textContent = '🎛️ Equalizer enabled'
           return state.equalizer.nodes()
         })
