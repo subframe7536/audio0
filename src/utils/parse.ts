@@ -258,13 +258,7 @@ export function createUrlFromBlob(blob: Blob): [string, VoidFunction] {
   return [url, () => URL.revokeObjectURL(url)]
 }
 
-export type ParseTrackResult = [
-  {
-    src: string
-    mime: string
-  },
-  VoidFunction,
-]
+export type ParseTrackResult = [{ src: string; mimeType: string }, VoidFunction]
 
 /**
  * Parse track from ReadableStream with optimized audio streaming
@@ -279,7 +273,7 @@ export function parseTrackFromStream(
     onError,
     ...options,
   })
-  return [{ src: url, mime: mimeType }, cleanup]
+  return [{ src: url, mimeType }, cleanup]
 }
 
 /**
@@ -287,7 +281,7 @@ export function parseTrackFromStream(
  */
 export function parseTrackFromFile(file: File): ParseTrackResult {
   const [url, cleanup] = createUrlFromBlob(file)
-  return [{ src: url, mime: file.type }, cleanup]
+  return [{ src: url, mimeType: file.type }, cleanup]
 }
 
 /**
@@ -295,7 +289,7 @@ export function parseTrackFromFile(file: File): ParseTrackResult {
  */
 export function parseTrackFromArrayBuffer(buffer: ArrayBuffer, mimeType: string): ParseTrackResult {
   const [src, cleanup] = createUrlFromBlob(new Blob([buffer], { type: mimeType }))
-  return [{ src, mime: mimeType }, cleanup]
+  return [{ src, mimeType }, cleanup]
 }
 
 /**
