@@ -76,14 +76,12 @@ const player = new ZPlayer({
     {
       src: () => fetch('./song2.mp3').then(r => r.body!),
       mimeType: 'audio/mpeg',
-      type: 'stream',
       title: 'Song 2',
       artist: 'Artist 2'
     },
     {
       src: () => fetch('./song3.wav').then(r => r.arrayBuffer()),
       mimeType: 'audio/wav',
-      type: 'buffer',
       title: 'Song 3',
       artist: 'Artist 3'
     }
@@ -146,15 +144,16 @@ import { parseTrack } from 'audio0'
 
 // For file from <input />
 const file = new File(/* options */)
-const { url, mime, cleanup: cleanup1 } = parseTrack(file)
+const [track1, cleanup1] = await parseTrack(file)
+// track1.src is the created URL, track1.mime is the mime type
 
 // For streams
 const response = await fetch('./audio.mp3')
-const { url, mime, cleanup: cleanup2 } = parseTrack(response.body!, 'audio/mpeg')
+const [track2, cleanup2] = await parseTrack(response.body!, 'audio/mpeg')
 
 // For buffers
 const buffer = await fetch('./audio.wav').then(r => r.arrayBuffer())
-const { url, mime, cleanup: cleanup3 } = parseTrack(buffer, 'audio/wav')
+const [track3, cleanup3] = await parseTrack(buffer, 'audio/wav')
 
 // Don't forget to cleanup
 cleanup1()
@@ -248,20 +247,21 @@ interface Track {
   score?: number  // For weighted shuffle
 }
 
+// File track (from an <input /> File)
+interface FileTrack extends Track {
+  src: File
+}
+
 // Stream track
-interface StreamTrack {
-  type: 'stream'
-  src: () => Promise<ReadableStream> | ReadableStream
+interface StreamTrack extends Track {
+  src: () => Promise<ReadableStream<Uint8Array>> | ReadableStream<Uint8Array>
   mimeType: string
-  // ... other metadata
 }
 
 // Buffer track
-interface BufferTrack {
-  type: 'buffer'
+interface BufferTrack extends Track {
   src: () => Promise<ArrayBuffer> | ArrayBuffer
   mimeType: string
-  // ... other metadata
 }
 ```
 
@@ -277,7 +277,7 @@ audio.on('timeupdate', (currentTime: number) => {})
 audio.on('volume', (volume: number) => {})
 audio.on('rate', (playbackRate: number) => {})
 audio.on('seek', (targetTime: number) => {})
-audio.on('load', (metadata: ParsedTrackInfo) => {})
+audio.on('load', (metadata: Track) => {})
 audio.on('error', (error: ZAudioError, code: number) => {})
 
 // ZPlayer additional events
@@ -308,17 +308,10 @@ function createWeightedArtistShuffle(
   getLimit?: (totalArtists: number) => number
 ): ShuffleIndexFn
 
-// Stream/Buffer utilities
-function useStream(
-  stream: ReadableStream<Uint8Array>,
-  mimeType: string,
-  onError?: (err: string) => void
-): [url: string, cleanup: VoidFunction]
-
-function useArrayBuffer(
-  buf: ArrayBuffer,
-  type: string
-): [url: string, cleanup: VoidFunction]
+function parseTrack(
+  track: TrackLike,
+  onError?: (msg: string) => void
+): Promise<[track: Track, cleanup: VoidFunction]>
 
 // Helper functions
 function bindEventListenerWithCleanup(

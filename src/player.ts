@@ -1,9 +1,10 @@
 import type {
   LoadOptions,
   LoopMode,
-  ParsedTrackInfo,
+  Track,
   PreloadConfig,
   ShuffleFn,
+  StreamBufferOptions,
   TrackLike,
   ZPlayerEvents,
   ZPlayerOptions,
@@ -15,6 +16,10 @@ import { defaultShuffle, parseTrack } from './utils'
 
 export class ZPlayer extends ZAudio<ZPlayerEvents> {
   public shuffleFn: ShuffleFn
+  /**
+   * Options for stream buffer
+   */
+  public streamBuffer: StreamBufferOptions
   private _curIdx = 0
   private _orderList: number[] = []
   private _trackList: TrackLike[] = []
@@ -29,7 +34,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
     audio: null as HTMLAudioElement | null,
     trackIndex: null as number | null,
     triggered: false,
-    info: null as ParsedTrackInfo | null,
+    info: null as Track | null,
   }
 
   constructor(config: ZPlayerOptions = {}) {
@@ -39,6 +44,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
       shuffleFn = defaultShuffle,
       loopMode = 'list',
       preload = true,
+      streamBuffer = {},
       ...audioConfig
     } = config
     super(audioConfig)
@@ -47,6 +53,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
     this._loopMode = LOOP_MODE.indexOf(loopMode)
     this.shuffleFn = shuffleFn
     this.setPreloadConfig(preload)
+    this.streamBuffer = streamBuffer
 
     if (trackList) {
       this.trackList = trackList
@@ -201,7 +208,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
       this._curIdx = Math.abs((index + this.trackList.length) % this.trackList.length)
     }
 
-    const loadAndEmit = async (info: ParsedTrackInfo): Promise<boolean> => {
+    const loadAndEmit = async (info: Track): Promise<boolean> => {
       const result = await this.load(info, options)
       if (result) {
         this.emit('loadTrack', this._curIdx, info)
@@ -226,21 +233,21 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
     return await loadAndEmit(await this._parseTrack(track))
   }
 
-  private async _parseTrack(track: TrackLike): Promise<ParsedTrackInfo> {
+  private async _parseTrack(track: TrackLike): Promise<Track> {
     this._cleanup?.()
     this._cleanup = undefined
-    if (typeof track.src === 'string') {
-      return track as ParsedTrackInfo
-    }
-    const src = typeof track.src === 'function' ? await track.src() : track.src
-    const { url, mime, cleanup } = parseTrack(src as any, track.mimeType as any, (msg) =>
-      this.emitError(msg, 5),
-    )
-    this._cleanup = cleanup
-    return {
-      ...track,
-      src: url,
-      mimeType: mime,
+
+    try {
+      const [parsedTrack, cleanup] = await parseTrack(
+        track,
+        (msg) => this.emitError(msg, 5),
+        this.streamBuffer,
+      )
+
+      this._cleanup = cleanup
+      return parsedTrack
+    } catch (err) {
+      return this.emitError(err instanceof Error ? err.message : String(err), 5) as any
     }
   }
 
@@ -291,6 +298,20 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
       this.cleanupPreloadedTrack()
       this._preload.triggered = false
     }
+  }
+
+  /**
+   * Update stream buffer options for audio streaming optimization
+   */
+  public setStreamBufferOptions(options: StreamBufferOptions): void {
+    this.streamBuffer = { ...this.streamBuffer, ...options }
+  }
+
+  /**
+   * Get current stream buffer options
+   */
+  public getStreamBufferOptions(): StreamBufferOptions {
+    return { ...this.streamBuffer }
   }
 
   public async destroy(): Promise<void> {

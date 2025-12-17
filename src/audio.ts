@@ -2,7 +2,7 @@ import type {
   Codecs,
   LoadingState,
   LoadOptions,
-  ParsedTrackInfo,
+  Track,
   ZAudioErrorCode,
   ZAudioEvents,
   ZAudioOptions,
@@ -403,7 +403,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
    * @param metadata track info
    * @param options load options
    */
-  public async load(metadata: ParsedTrackInfo, options: LoadOptions = {}): Promise<boolean> {
+  public async load(metadata: Track, options: LoadOptions = {}): Promise<boolean> {
     const autoPlay = options.autoPlay ?? this.isPlaying
     if (this.isPlaying) {
       await this.stop()
@@ -585,7 +585,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     this.nodes?.forEach((n) => {
       try {
         n.disconnect()
-      } catch { }
+      } catch {}
     })
     this.nodes = null!
     this.audio = null!

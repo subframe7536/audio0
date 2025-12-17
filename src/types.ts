@@ -25,7 +25,7 @@ export interface TrackInfo extends MediaMetadataInit {
   score?: number
 }
 
-export interface ParsedTrackInfo extends TrackInfo {
+export interface Track extends TrackInfo {
   /**
    * Audio src url
    */
@@ -33,11 +33,6 @@ export interface ParsedTrackInfo extends TrackInfo {
   /**
    * Audio mime type
    */
-  mimeType?: string
-}
-
-export interface Track extends TrackInfo {
-  src: string
   mimeType?: string
 }
 
@@ -140,6 +135,19 @@ export interface PreloadConfig {
   threshold: number
 }
 
+export interface StreamBufferOptions {
+  /**
+   * Buffer size in bytes for audio chunks
+   * @default 2 << 18 (256KB)
+   */
+  bufferSize?: number
+  /**
+   * Maximum buffer duration in seconds
+   * @default 30
+   */
+  maxBufferDuration?: number
+}
+
 export interface ZPlayerOptions extends ZAudioOptions {
   /**
    * track list
@@ -163,6 +171,10 @@ export interface ZPlayerOptions extends ZAudioOptions {
    * @default 80
    */
   preload?: boolean | PreloadConfig
+  /**
+   * Stream buffer options for audio streaming optimization
+   */
+  streamBuffer?: StreamBufferOptions
 }
 
 export interface LoadOptions extends RetryOptions {
@@ -190,7 +202,7 @@ export type ZAudioEvents = {
   mute: [isMuted: boolean]
   rate: [playbackRate: number]
   seek: [targetTime: number]
-  load: [metadata: ParsedTrackInfo]
+  load: [metadata: Track]
   error: [err: ZAudioError, code: ZAudioErrorCode]
   ended: []
 }
