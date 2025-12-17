@@ -409,8 +409,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
       await this.stop()
     }
 
-    const newSrc = metadata.src
-    const ext = this.extractExt(newSrc, options.mimeType)
+    const ext = this.extractExt(metadata.src, metadata.mimeType)
 
     if (!ext || !this.codecs.has(ext.toLowerCase())) {
       return this.emitError(`MIMETYPE ${ext} is unsupported`)
@@ -427,7 +426,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     this.state = 'loading'
     this._isEnding = false
 
-    const loadResult = await this.loadAudioWithRetry(this.audio, newSrc, {
+    const loadResult = await this.loadAudioWithRetry(this.audio, metadata.src, {
       count: options.retryCount,
       delay: options.retryDelay,
     })
@@ -586,7 +585,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     this.nodes?.forEach((n) => {
       try {
         n.disconnect()
-      } catch {}
+      } catch { }
     })
     this.nodes = null!
     this.audio = null!

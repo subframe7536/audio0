@@ -26,7 +26,14 @@ export interface TrackInfo extends MediaMetadataInit {
 }
 
 export interface ParsedTrackInfo extends TrackInfo {
+  /**
+   * Audio src url
+   */
   src: string
+  /**
+   * Audio mime type
+   */
+  mimeType?: string
 }
 
 export interface Track extends TrackInfo {
@@ -157,10 +164,6 @@ export interface ZPlayerOptions extends ZAudioOptions {
 }
 
 export interface LoadOptions extends RetryOptions {
-  /**
-   * Audio mime type
-   */
-  mimeType?: string
   /**
    * Audio start time
    */

@@ -32,7 +32,6 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
     trackIndex: null as number | null,
     triggered: false,
     info: null as ParsedTrackInfo | null,
-    mimeType: null as string | null,
   }
 
   constructor(config: ZPlayerOptions = {}) {
@@ -157,12 +156,11 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
         this._preload.audio = new Audio()
       }
 
-      const { info, mimeType } = await this.parseTrack(nextTrack)
+      const info = await this.parseTrack(nextTrack)
       await this.loadAudioWithRetry(this._preload.audio, info.src)
 
       this._preload.trackIndex = nextIndex
       this._preload.info = info
-      this._preload.mimeType = mimeType
     } catch (error) {
       // Silently fail preloading, it's not critical
       console.warn('Failed to preload next track:', error)
@@ -189,7 +187,6 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
       this._preload.audio.load()
       this._preload.trackIndex = null
       this._preload.info = null
-      this._preload.mimeType = null
     }
   }
 
@@ -206,14 +203,8 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
       this._curIdx = Math.abs((index + this.trackList.length) % this.trackList.length)
     }
 
-    const loadAndEmit = async ({
-      info,
-      mimeType,
-    }: {
-      info: ParsedTrackInfo
-      mimeType: string
-    }): Promise<boolean> => {
-      const result = await this.load(info, { mimeType, ...options })
+    const loadAndEmit = async (info: ParsedTrackInfo): Promise<boolean> => {
+      const result = await this.load(info, options)
       if (result) {
         this.emit('loadTrack', this._curIdx, info)
       }
@@ -224,14 +215,13 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
     if (
       this._preload.enable &&
       this._preload.trackIndex === this._curIdx &&
-      this._preload.info &&
-      this._preload.mimeType !== null
+      this._preload.info
     ) {
       // Clean up preload data since we're using it
       this.cleanupPreloadedTrack()
       this._preload.triggered = false
 
-      return await loadAndEmit(this._preload as Awaited<ReturnType<typeof this.parseTrack>>)
+      return await loadAndEmit(this._preload.info as Awaited<ReturnType<typeof this.parseTrack>>)
     }
 
     const track = this.getTrack()
@@ -242,7 +232,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
     return await loadAndEmit(await this.parseTrack(track))
   }
 
-  private async parseTrack(track: TrackLike): Promise<{ info: ParsedTrackInfo; mimeType: string }> {
+  private async parseTrack(track: TrackLike): Promise<ParsedTrackInfo> {
     this._cleanup?.()
     this._cleanup = undefined
 
@@ -268,7 +258,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
         info = track
       }
     }
-    return { info, mimeType }
+    return info
   }
 
   public async prevTrack(options?: LoadOptions): Promise<boolean> {
