@@ -53,7 +53,7 @@ audio.on('error', (error, code) => {
 })
 
 // Load and play
-await audio.load({ 
+await audio.load({
   src: './audio.mp3',
   title: 'My Song',
   artist: 'Artist Name'
@@ -68,14 +68,14 @@ import { ZPlayer } from 'audio0'
 
 const player = new ZPlayer({
   trackList: [
-    { 
+    {
       src: './song1.mp3',
       title: 'Song 1',
       artist: 'Artist 1'
     },
-    { 
-      src: () => fetch('./song2.mp3').then(r => r.body!), 
-      mimeType: 'audio/mpeg', 
+    {
+      src: () => fetch('./song2.mp3').then(r => r.body!),
+      mimeType: 'audio/mpeg',
       type: 'stream',
       title: 'Song 2',
       artist: 'Artist 2'
@@ -118,12 +118,12 @@ const audio = new ZAudio({
   extraAudioNodes: (ctx) => {
     // Create equalizer
     const eq = createEqualizer(ctx, defaultFreq)
-    
+
     // Adjust specific frequencies
     eq.handle(1000, (band) => {
       band.gain.value = 5 // Boost 1kHz by 5dB
     })
-    
+
     return eq.nodes()
   }
 })
@@ -134,27 +134,32 @@ audio.handleContext((ctx, nodes) => {
   compressor.threshold.value = -24
   compressor.knee.value = 30
   compressor.ratio.value = 12
-  
+
   return [...nodes, compressor]
 })
 ```
 
-### Stream & Buffer Handling
+### Stream & File & Buffer Handling
 
 ```ts
-import { useStream, useArrayBuffer } from 'audio0'
+import { parseTrack } from 'audio0'
+
+// For file from <input />
+const file = new File(/* options */)
+const { url, mime, cleanup: cleanup1 } = parseTrack(file)
 
 // For streams
 const response = await fetch('./audio.mp3')
-const [streamUrl, cleanup1] = useStream(response.body!, 'audio/mpeg')
+const { url, mime, cleanup: cleanup2 } = parseTrack(response.body!, 'audio/mpeg')
 
 // For buffers
 const buffer = await fetch('./audio.wav').then(r => r.arrayBuffer())
-const [bufferUrl, cleanup2] = useArrayBuffer(buffer, 'audio/wav')
+const { url, mime, cleanup: cleanup3 } = parseTrack(buffer, 'audio/wav')
 
 // Don't forget to cleanup
 cleanup1()
 cleanup2()
+cleanup3()
 ```
 
 ### Waveform Generation
@@ -251,7 +256,7 @@ interface StreamTrack {
   // ... other metadata
 }
 
-// Buffer track  
+// Buffer track
 interface BufferTrack {
   type: 'buffer'
   src: () => Promise<ArrayBuffer> | ArrayBuffer
@@ -285,7 +290,7 @@ player.on('reorder', () => {})
 ```ts
 // Audio buffer processing
 function normalizeAudioBuffer(
-  buf: AudioBuffer, 
+  buf: AudioBuffer,
   blockNum?: number,    // Result block amount (default: 1000)
   max?: number,         // Max value 0-1 (default: 0.9)
   min?: number          // Min value 0-1 (default: 0.1)
@@ -331,7 +336,7 @@ function clamp(min: number, val: number, max: number): number
 ## Browser Support
 
 - **Chrome/Edge**: Full support
-- **Firefox**: Full support  
+- **Firefox**: Full support
 - **Safari**: Full support (iOS 16+)
 - **Mobile browsers**: Full support with auto-unlock
 

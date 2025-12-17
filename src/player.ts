@@ -11,9 +11,7 @@ import type {
 
 import { ZAudio } from './audio'
 import { LOOP_MODE } from './types'
-import { useArrayBuffer } from './utils/buffer'
-import { defaultShuffle } from './utils/shuffle'
-import { useStream } from './utils/stream'
+import { defaultShuffle, parseTrack } from './utils'
 
 export class ZPlayer extends ZAudio<ZPlayerEvents> {
   public shuffleFn: ShuffleFn
@@ -156,7 +154,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
         this._preload.audio = new Audio()
       }
 
-      const info = await this.parseTrack(nextTrack)
+      const info = await this._parseTrack(nextTrack)
       await this.loadAudioWithRetry(this._preload.audio, info.src)
 
       this._preload.trackIndex = nextIndex
@@ -212,16 +210,12 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
     }
 
     // Check if we can use preloaded track data
-    if (
-      this._preload.enable &&
-      this._preload.trackIndex === this._curIdx &&
-      this._preload.info
-    ) {
+    if (this._preload.enable && this._preload.trackIndex === this._curIdx && this._preload.info) {
       // Clean up preload data since we're using it
       this.cleanupPreloadedTrack()
       this._preload.triggered = false
 
-      return await loadAndEmit(this._preload.info as Awaited<ReturnType<typeof this.parseTrack>>)
+      return await loadAndEmit(this._preload.info as Awaited<ReturnType<typeof this._parseTrack>>)
     }
 
     const track = this.getTrack()
@@ -229,36 +223,25 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
       return false
     }
 
-    return await loadAndEmit(await this.parseTrack(track))
+    return await loadAndEmit(await this._parseTrack(track))
   }
 
-  private async parseTrack(track: TrackLike): Promise<ParsedTrackInfo> {
+  private async _parseTrack(track: TrackLike): Promise<ParsedTrackInfo> {
     this._cleanup?.()
     this._cleanup = undefined
-
-    let info: ParsedTrackInfo
-    const mimeType = track.mimeType || ''
-
-    switch (track.type) {
-      case 'stream': {
-        const [src, cleanup] = useStream(await track.src(), mimeType, (err) =>
-          this.emitError(err, 5),
-        )
-        this._cleanup = cleanup
-        info = { ...track, src }
-        break
-      }
-      case 'buffer': {
-        const [src, cleanup] = useArrayBuffer(await track.src(), mimeType)
-        this._cleanup = cleanup
-        info = { ...track, src }
-        break
-      }
-      default: {
-        info = track
-      }
+    if (typeof track.src === 'string') {
+      return track as ParsedTrackInfo
     }
-    return info
+    const src = typeof track.src === 'function' ? await track.src() : track.src
+    const { url, mime, cleanup } = parseTrack(src as any, track.mimeType as any, (msg) =>
+      this.emitError(msg, 5),
+    )
+    this._cleanup = cleanup
+    return {
+      ...track,
+      src: url,
+      mimeType: mime,
+    }
   }
 
   public async prevTrack(options?: LoadOptions): Promise<boolean> {

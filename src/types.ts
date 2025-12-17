@@ -37,24 +37,26 @@ export interface ParsedTrackInfo extends TrackInfo {
 }
 
 export interface Track extends TrackInfo {
-  type?: 'url'
   src: string
   mimeType?: string
 }
 
+export interface FileTrack extends TrackInfo {
+  src: File
+  mimeType?: string
+}
+
 export interface StreamTrack extends TrackInfo {
-  type: 'stream'
-  src: () => Promisable<ReadableStream>
+  src: () => Promisable<ReadableStream<Uint8Array>>
   mimeType: string
 }
 
 export interface BufferTrack extends TrackInfo {
-  type: 'buffer'
   src: () => Promisable<ArrayBuffer>
   mimeType: string
 }
 
-export type TrackLike = Track | StreamTrack | BufferTrack
+export type TrackLike = Track | FileTrack | StreamTrack | BufferTrack
 
 /**
  * Shuffle an array

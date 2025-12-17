@@ -5,5 +5,8 @@
     "source.organizeImports": "never"
   },
   "editor.formatOnSave": true,
-  "oxc.fmt.experimental": true
+  "oxc.fmt.experimental": true,
+  "[typescript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
 }

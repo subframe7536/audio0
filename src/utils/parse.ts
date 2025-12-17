@@ -15,15 +15,15 @@ async function waitForUpdate(source: SourceBuffer): Promise<void> {
  * @example
  * ```ts
  * // Use the URL
- * const [url, cleanup] = useStream(await fetch(url).then(r => r.body!), 'audio/wav')
+ * const [url, cleanup] = createUrlFromStream(await fetch(url).then(r => r.body!), 'audio/wav')
  * // Call when done to free memory
  * cleanup()
  * ```
  */
-export function useStream(
+function createUrlFromStream(
   stream: ReadableStream<Uint8Array>,
   mimeType: string,
-  onError?: (err: string) => void,
+  onError?: (msg: string) => void,
 ): [url: string, cleanup: VoidFunction] {
   const ms = new MediaSource()
   let sourceBuffer: SourceBuffer | null = null
@@ -88,4 +88,35 @@ export function useStream(
       URL.revokeObjectURL(url)
     },
   ]
+}
+
+interface ParseTrackResult {
+  url: string
+  mime: string
+  cleanup: VoidFunction
+}
+
+export function parseTrack(src: File): ParseTrackResult
+export function parseTrack(src: ArrayBuffer, mime: string): ParseTrackResult
+export function parseTrack(
+  src: ReadableStream<Uint8Array>,
+  mime: string,
+  onError: (msg: string) => void,
+): ParseTrackResult
+export function parseTrack(
+  src: ReadableStream<Uint8Array> | ArrayBuffer | File,
+  mime?: string,
+  onError?: (msg: string) => void,
+): ParseTrackResult {
+  let stream: ReadableStream<Uint8Array>
+  if (src instanceof File) {
+    stream = src.stream()
+    mime = src.type
+  } else if (src instanceof ArrayBuffer) {
+    stream = new Blob([src], { type: mime }).stream()
+  } else {
+    stream = src
+  }
+  const [result, cleanup] = createUrlFromStream(stream, mime!, onError)
+  return { url: result, mime: mime!, cleanup }
 }
