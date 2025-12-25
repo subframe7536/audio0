@@ -1,4 +1,5 @@
 /* eslint-disable prefer-template */
+import type { Promisable } from '@subframe7536/type-utils'
 import type { Codecs } from '../types'
 
 export function getCodecs(): Codecs {
@@ -69,6 +70,8 @@ export function secondToTime(second: number): string {
 }
 
 /**
+ * @deprecated use {@link createWaveformGenerator} instead
+ *
  * Parse audio buffer to array, use for generate audio waveform
  * @param buf source audio buffer
  * @param blockNum result block amount
@@ -106,4 +109,126 @@ export function normalizeAudioBuffer(
     result[i] = Math.round(Math.max((result[i] * max) / tempMax, min) * 1e5) / 1e5
   }
   return result
+}
+/**
+ * Resamples audio data to a target length using peak hold algorithm.
+ * For downsampling (targetLength < source.length), it takes the maximum absolute value in each block.
+ * For upsampling (targetLength > source.length), it uses nearest-neighbor interpolation.
+ *
+ * @param source - Original audio data as absolute values (Float32Array)
+ * @param targetLength - Desired number of samples in output
+ * @returns Resampled waveform data
+ */
+function resampleAudioData(source: Float32Array, targetLength: number): Float32Array {
+  const sourceLen = source.length
+  if (targetLength <= 0 || sourceLen === 0) {
+    return new Float32Array(0)
+  }
+
+  // Handle direct copy case
+  if (targetLength === sourceLen) {
+    return source.slice()
+  }
+
+  const result = new Float32Array(targetLength)
+  const scale = sourceLen / targetLength
+
+  // Downsampling: peak detection
+  if (scale >= 1) {
+    for (let i = 0; i < targetLength; i++) {
+      const start = Math.floor(i * scale)
+      const end = Math.min(Math.floor((i + 1) * scale), sourceLen)
+
+      let peak = 0
+      for (let j = start; j < end; j++) {
+        const val = source[j]
+        if (val > peak) {
+          peak = val
+        }
+      }
+      result[i] = peak
+    }
+  }
+  // Upsampling: nearest-neighbor
+  else {
+    for (let i = 0; i < targetLength; i++) {
+      const pos = Math.min(Math.floor(i * scale), sourceLen - 1)
+      result[i] = source[pos]
+    }
+  }
+
+  return result
+}
+
+interface WaveformOptions {
+  /**
+   * Minimum normalized value
+   * @default 0.1
+   */
+  min?: number
+  /**
+   * Maximum normalized value (default: 0.9)
+   * @default 0.9
+   */
+  max?: number
+}
+
+/**
+ * Creates a waveform generator function from raw audio data.
+ * The generator produces normalized waveform blocks suitable for visualization.
+ *
+ * **NO CACHE BUILT-IN !!!**
+ *
+ * @param buffer - Raw audio data in ArrayBuffer format
+ * @returns A generator function that creates waveform blocks
+ *
+ * @example
+ * const generateWaveform = await createWaveformGenerator(file.arrayBuffer());
+ * const waveform = generateWaveform(128, { min: 0.2, max: 0.8 });
+ */
+export async function createWaveformGenerator(
+  buffer: Promisable<ArrayBuffer>,
+): Promise<(blockCount: number, options?: WaveformOptions) => Float32Array> {
+  const ctx = new OfflineAudioContext(1, 1, 44100)
+
+  const audioData = await ctx.decodeAudioData(await buffer)
+  const channelData = audioData.getChannelData(0)
+  const absData = new Float32Array(channelData.length)
+  let globalPeak = 0
+
+  // Precompute absolute values and global peak
+  for (let i = 0; i < channelData.length; i++) {
+    const val = Math.abs(channelData[i])
+    absData[i] = val
+    if (val > globalPeak) {
+      globalPeak = val
+    }
+  }
+
+  return (blockCount: number, { min = 0.1, max = 0.9 } = {}) => {
+    // Validate inputs
+    if (globalPeak === 0) {
+      throw new Error('Cannot generate waveform from silent audio')
+    }
+
+    if (!Number.isInteger(blockCount) || blockCount <= 0) {
+      throw new RangeError(`Invalid block count: ${blockCount}. Must be positive integer.`)
+    }
+
+    if (min < 0 || max > 1 || min >= max) {
+      throw new RangeError(
+        `Invalid normalization range [${min}, ${max}]. Must satisfy 0 <= min < max <= 1.`,
+      )
+    }
+
+    // Normalize cached data (always create new array to prevent mutation)
+    const scale = (max - min) / globalPeak
+    const data = resampleAudioData(absData, blockCount)!
+
+    for (let i = 0; i < data.length; i++) {
+      data[i] = min + data[i] * scale
+    }
+
+    return data
+  }
 }
