@@ -186,14 +186,17 @@ const waveformData = normalizeAudioBuffer(
 ### Custom Shuffle Algorithm
 
 ```ts
-import { ZPlayer, createWeightedArtistShuffle } from 'audio0'
+import { ZPlayer, weightedShuffle, createSmartShuffle } from 'audio0'
 
-const customShuffle = createWeightedArtistShuffle(
-  (totalArtists) => Math.min(totalArtists, 10) // Limit artist diversity
-)
+const customShuffle = createSmartShuffle({
+  factor: (score) => 5 - score, // custom weight factor
+  getSeed: () => 1, // custom seed
+  desc: true // custom sort direction
+})
 
 const player = new ZPlayer({
-  shuffleFn: customShuffle,
+  // Or shuffleFn: customShuffle,
+  shuffleFn: weightedShuffle,
   trackList: tracks.map(track => ({
     ...track,
     score: calculateTrackScore(track) // Your scoring logic

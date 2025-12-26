@@ -1,16 +1,5 @@
-import type { TrackInfo } from '../types'
-
-import { shuffle as weightedShuffle } from 'weighted-shuffle'
-
-import { clamp } from './common'
-
-export type ShuffleIndexFn = (songs: TrackInfo[]) => number[]
-
-export const defaultShuffle: ShuffleIndexFn = (array: TrackInfo[]) => {
-  const arr = Array.from({ length: array.length }, (_, i) => i)
-  shuffleFn(arr)
-  return arr
-}
+// oxlint-disable no-new-array
+import type { ShuffleFn, TrackInfo } from '../types'
 
 /**
  * Basic shuffle function
@@ -25,76 +14,109 @@ export function shuffleFn(arr: any[]): void {
   }
 }
 
-type GetLimitFn = (totalArtists: number) => number
+export const defaultShuffle: ShuffleFn = (array: TrackInfo[]) => {
+  const arr = Array.from({ length: array.length }, (_, i) => i)
+  shuffleFn(arr)
+  return arr
+}
 
 /**
- * Create shuffle function that weighted shuffle by artist and score
- * @param getLimit get limit function. The larger of result, the more shuffled, the poor performance, @default n => n * 2 / 3
+ * Generates a weighted random permutation of indices based on optional scores.
+ * Higher `score` values increase the chance of an index appearing earlier.
+ * Does not modify the input array.
+ *
+ * @param array - Array of track info objects with optional `score` property
+ * @returns An array of shuffled indices (0-based), length equals `tracks.length`
  */
-export function createWeightedArtistShuffle(
-  getLimit: GetLimitFn = (n) => (n * 2) / 3,
-): ShuffleIndexFn {
+export const weightedShuffle: ShuffleFn = (array: TrackInfo[]) => {
+  const len = array.length
+  if (len <= 1) {
+    return len === 0 ? [] : [0]
+  }
+
+  const weights = new Float32Array(len)
+  const result = new Array<number>(len)
+
+  // Single pass: initialize indices and compute weights
+  for (let i = 0; i < len; i++) {
+    result[i] = i
+    weights[i] = Math.random() * (array[i].score ?? 3)
+  }
+
+  // Sort indices by weights in descending order
+  result.sort((a, b) => weights[b] - weights[a])
+
+  return result
+}
+
+interface SmartShuffleOptions {
+  factor?: (score?: number) => number
+  getSeed?: () => number
+  desc?: boolean
+}
+
+export function createSmartShuffle(options: SmartShuffleOptions = {}): ShuffleFn {
+  const { getSeed = () => Date.now(), factor = () => 1, desc = false } = options
+  const sortFn: (pos: Float64Array, a: number, b: number) => number = desc
+    ? (pos, a, b) => pos[b] - pos[a]
+    : (pos, a, b) => pos[a] - pos[b]
   return (songs: TrackInfo[]) => {
-    const artistMap = new Map<string, [number, number][]>()
-    for (let i = 0; i < songs.length; i++) {
-      const artist = songs[i].artist || 'unknown'
-      if (!artistMap.has(artist)) {
-        artistMap.set(artist, [])
-      }
-      artistMap.get(artist)!.push([i, songs[i].score ?? 3])
+    const len = songs.length
+    if (len <= 1) {
+      return len === 0 ? [] : [0]
     }
 
-    for (const v of artistMap.values()) {
-      weightedShuffle(v)
+    // 1. Create index array and group by artist
+    const artistsMap = new Map<string, number[]>()
+    const result = new Array<number>(len)
+
+    for (let i = 0; i < len; i++) {
+      result[i] = i
+      const artist = songs[i].artist || 'DEFAULT'
+      let indices = artistsMap.get(artist)
+      if (!indices) {
+        indices = []
+        artistsMap.set(artist, indices)
+      }
+      indices.push(i)
     }
 
-    const result: number[] = []
-    const artists = Array.from(artistMap.keys())
-    const totalCount = songs.length
-    const windowSize = Math.min(artists.length, 5)
-    const limit = getLimit(artists.length)
+    // 2. Prepare positions array
+    const positions = new Float64Array(len)
+    const globalOffset = Math.abs(Math.sin(getSeed()) * 10000) % 1
 
-    for (let i = 0; i < totalCount; i++) {
-      const _index = i % artists.length
-      if (_index === 0) {
-        shuffleFn(artists)
-      }
-      const artist = artists[_index]
-      const artistAlbums = artistMap.get(artist)!
-      const [data] = artistAlbums.shift()!
+    // 3. Iterate through artists to calculate positions
+    for (const [artist, artistItems] of artistsMap.entries()) {
+      const count = artistItems.length
+      const density = count / len
 
-      if (artists.length < limit) {
-        const windowStart = Math.max(0, i - windowSize)
-        const windowEnd = Math.min(result.length, i + windowSize)
-        let bestIndex = i
-        let maxDistance = -1
+      // 4. Calculate hash per artist based on the Golden Ratio
+      const hash = (stringHash(artist) + globalOffset) % 1
+      const artistBaseOffset = (hash * 0.618033988749895) % (1 - density + 0.001)
 
-        for (let i = windowStart; i <= windowEnd; i++) {
-          let minDistance = i === result.length ? i : Infinity
-          for (
-            let j = Math.max(0, i - windowSize);
-            j < Math.min(result.length, i + windowSize);
-            j++
-          ) {
-            if (songs[result[j]].artist === artist) {
-              minDistance = Math.min(minDistance, Math.abs(i - j))
-            }
-          }
-          if (minDistance > maxDistance) {
-            maxDistance = minDistance
-            bestIndex = i
-          }
-        }
-        const targetIndex = clamp(0, bestIndex + Math.floor(Math.random() * 3) - 1, result.length)
-        result.splice(targetIndex, 0, data)
-      } else {
-        result[i] = data
-      }
+      // 5. Shuffle in-place
+      shuffleFn(artistItems)
 
-      if (!artistAlbums.length) {
-        artists.splice(_index, 1)
+      // 6. Calculate positions
+      for (let i = 0; i < count; i++) {
+        const randomJitter = (Math.random() * 0.1) / count
+        positions[artistItems[i]] =
+          ((artistBaseOffset + i / count + randomJitter) % 1) * factor(songs[artistItems[i]].score)
       }
     }
+
+    // 7. Sort indices by referencing the positions array
+    result.sort((a, b) => sortFn(positions, a, b))
+
     return result
   }
+}
+
+function stringHash(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i)
+    hash |= 0
+  }
+  return Math.abs(hash) / 2147483647
 }
