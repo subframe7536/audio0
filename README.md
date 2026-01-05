@@ -164,20 +164,21 @@ cleanup3()
 ### Waveform Generation
 
 ```ts
-import { normalizeAudioBuffer } from 'audio0'
+import { createWaveformGenerator } from 'audio0'
 
 // Decode audio for waveform
-const audioContext = new AudioContext()
 const response = await fetch('./audio.mp3')
 const arrayBuffer = await response.arrayBuffer()
-const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+const resample = await createWaveformGenerator(arrayBuffer)
 
 // Generate waveform data
-const waveformData = normalizeAudioBuffer(
-  audioBuffer,
-  1000, // 1000 data points
-  0.9,  // max amplitude
-  0.1   // min amplitude
+const waveformData = resample(
+  48,
+  {
+    min: 0.1, // Minimum normalized value
+    max: 0.9, // Maximum normalized value
+    power: 2.5 // Exponent for non-linear scaling
+  }
 )
 
 // Use waveformData for visualization

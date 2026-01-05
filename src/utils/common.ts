@@ -110,55 +110,6 @@ export function normalizeAudioBuffer(
   }
   return result
 }
-/**
- * Resamples audio data to a target length using peak hold algorithm.
- * For downsampling (targetLength < source.length), it takes the maximum absolute value in each block.
- * For upsampling (targetLength > source.length), it uses nearest-neighbor interpolation.
- *
- * @param source - Original audio data as absolute values (Float32Array)
- * @param targetLength - Desired number of samples in output
- * @returns Resampled waveform data
- */
-function resampleAudioData(source: Float32Array, targetLength: number): Float32Array {
-  const sourceLen = source.length
-  if (targetLength <= 0 || sourceLen === 0) {
-    return new Float32Array(0)
-  }
-
-  // Handle direct copy case
-  if (targetLength === sourceLen) {
-    return source.slice()
-  }
-
-  const result = new Float32Array(targetLength)
-  const scale = sourceLen / targetLength
-
-  // Downsampling: peak detection
-  if (scale >= 1) {
-    for (let i = 0; i < targetLength; i++) {
-      const start = Math.floor(i * scale)
-      const end = Math.min(Math.floor((i + 1) * scale), sourceLen)
-
-      let peak = 0
-      for (let j = start; j < end; j++) {
-        const val = source[j]
-        if (val > peak) {
-          peak = val
-        }
-      }
-      result[i] = peak
-    }
-  }
-  // Upsampling: nearest-neighbor
-  else {
-    for (let i = 0; i < targetLength; i++) {
-      const pos = Math.min(Math.floor(i * scale), sourceLen - 1)
-      result[i] = source[pos]
-    }
-  }
-
-  return result
-}
 
 interface WaveformOptions {
   /**
@@ -167,10 +118,17 @@ interface WaveformOptions {
    */
   min?: number
   /**
-   * Maximum normalized value (default: 0.9)
+   * Maximum normalized value
    * @default 0.9
    */
   max?: number
+  /**
+   * Exponent for non-linear scaling
+   * > 1.0 increases contrast (quieter sounds get smaller, peaks stay high)
+   * < 1.0 boosts quiet sounds (compression)
+   * @default 2.5
+   */
+  power?: number
 }
 
 /**
@@ -188,28 +146,39 @@ interface WaveformOptions {
  */
 export async function createWaveformGenerator(
   buffer: Promisable<ArrayBuffer>,
+  globalOptions: WaveformOptions = {},
 ): Promise<(blockCount: number, options?: WaveformOptions) => Float32Array> {
   const ctx = new OfflineAudioContext(1, 1, 44100)
 
+  // 1. Decode Audio
   const audioData = await ctx.decodeAudioData(await buffer)
   const channelData = audioData.getChannelData(0)
-  const absData = new Float32Array(channelData.length)
-  let globalPeak = 0
+  const sourceLen = channelData.length
 
-  // Precompute absolute values and global peak
-  for (let i = 0; i < channelData.length; i++) {
+  // 2. Precompute Global Peak (Single pass scan)
+  // We do NOT create a new 'absData' array here to save RAM.
+  let globalPeak = 0
+  for (let i = 0; i < sourceLen; i++) {
     const val = Math.abs(channelData[i])
-    absData[i] = val
     if (val > globalPeak) {
       globalPeak = val
     }
   }
 
-  return (blockCount: number, { min = 0.1, max = 0.9 } = {}) => {
-    // Validate inputs
-    if (globalPeak === 0) {
-      throw new Error('Cannot generate waveform from silent audio')
-    }
+  // Prevent division by zero if silence
+  if (globalPeak === 0) {
+    globalPeak = 1
+  }
+
+  /**
+   * Generator Function
+   */
+  return (blockCount: number, options: WaveformOptions = {}) => {
+    const {
+      min = globalOptions.min || 0.1,
+      max = globalOptions.max || 0.9,
+      power = globalOptions.power || 2.5,
+    } = options
 
     if (!Number.isInteger(blockCount) || blockCount <= 0) {
       throw new RangeError(`Invalid block count: ${blockCount}. Must be positive integer.`)
@@ -221,14 +190,61 @@ export async function createWaveformGenerator(
       )
     }
 
-    // Normalize cached data (always create new array to prevent mutation)
-    const scale = (max - min) / globalPeak
-    const data = resampleAudioData(absData, blockCount)!
+    const output = new Float32Array(blockCount)
 
-    for (let i = 0; i < data.length; i++) {
-      data[i] = min + data[i] * scale
+    // Calculate stride
+    // step: how many source samples per 1 output pixel
+    const step = sourceLen / blockCount
+
+    // Pre-calculate scale factor for the final output range
+    const range = max - min
+    const invGlobalPeak = 1 / globalPeak
+
+    // DOWNSAMPLING (Standard Case: Audio is longer than output pixels)
+    if (step >= 1) {
+      for (let i = 0; i < blockCount; i++) {
+        const start = Math.floor(i * step)
+        const end = Math.floor((i + 1) * step)
+
+        // Find Peak in chunk
+        let localPeak = 0
+        // Optimization: Use a while loop or check bounds safely
+        const safeEnd = end < sourceLen ? end : sourceLen
+
+        for (let j = start; j < safeEnd; j++) {
+          const val = Math.abs(channelData[j])
+          if (val > localPeak) {
+            localPeak = val
+          }
+        }
+
+        // Processing Pipeline:
+        // 1. Normalize (0 to 1) relative to song volume
+        let n = localPeak * invGlobalPeak
+
+        // 2. Apply Power Curve (Increases difference/contrast)
+        if (power !== 1) {
+          n = Math.pow(n, power)
+        }
+
+        // 3. Map to output range (min to max)
+        output[i] = min + n * range
+      }
+    }
+    // UPSAMPLING (Rare Case: Zoomed in extremely close)
+    else {
+      for (let i = 0; i < blockCount; i++) {
+        const index = Math.min(Math.floor(i * step), sourceLen - 1)
+        let n = Math.abs(channelData[index]) * invGlobalPeak
+
+        if (power !== 1) {
+          n = Math.pow(n, power)
+        }
+
+        output[i] = min + n * range
+      }
     }
 
-    return data
+    return output
   }
 }
