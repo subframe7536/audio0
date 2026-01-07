@@ -345,9 +345,13 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
   }
 
   protected extractExt(newSrc: string, mimeType?: string): string | undefined {
+    if (newSrc.startsWith('blob:') && !mimeType) {
+      this.emitError('Cannot extract extension from blob URL without MIME type')
+      return undefined
+    }
     return (
-      newSrc.split('?', 1)[0].match(/\.([^.]+)$/)?.[1] ||
       mimeType?.split('/')[1]?.split(';')[0] ||
+      newSrc.split('?', 1)[0].match(/\.([^.]+)$/)?.[1] ||
       newSrc.match(/^data:audio\/([^;]+);/i)?.[1]
     )
   }
