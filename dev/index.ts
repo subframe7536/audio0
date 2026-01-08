@@ -1,8 +1,8 @@
 import { ZAudio, ZPlayer } from '../src'
 import {
-  normalizeAudioBuffer,
+  createWaveformGenerator,
   createEqualizer,
-  createWeightedArtistShuffle,
+  createSmartShuffle,
   secondToTime,
 } from '../src/utils'
 import mp3 from './test.mp3?url'
@@ -251,7 +251,7 @@ function initPlayerDemo() {
       title: 'Demo Track 1',
       artist: 'Artist A',
       album: 'Album X',
-      score: 5,
+      score: 3,
     },
     {
       src: () => fetch(mp3).then((r) => r.arrayBuffer()),
@@ -278,7 +278,7 @@ function initPlayerDemo() {
     trackList: tracks,
     autoNext: state.autoNext,
     mediaSession: true,
-    shuffleFn: createWeightedArtistShuffle(),
+    shuffleFn: createSmartShuffle(),
     loopMode: 'list',
   })
 
@@ -560,12 +560,10 @@ function initWaveformDemo() {
       // Fetch and decode audio
       const response = await fetch(ogg)
       const arrayBuffer = await response.arrayBuffer()
-      const audioContext = new OfflineAudioContext({ length: 1, sampleRate: 44100 })
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
 
       // Generate waveform data
       console.time('Waveform Generation')
-      state.currentWaveform = normalizeAudioBuffer(audioBuffer, 100, 0.9, 0.1)
+      state.currentWaveform = await createWaveformGenerator(arrayBuffer).then(calc => Array.from(calc(100)))
       console.timeEnd('Waveform Generation')
 
       // Render waveform
