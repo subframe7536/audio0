@@ -177,7 +177,7 @@ const waveformData = resample(
   {
     min: 0.1, // Minimum normalized value
     max: 0.9, // Maximum normalized value
-    power: 2.5 // Exponent for non-linear scaling
+    amplitudePercentile: 0.99 // Top 1% loudest peaks are ignored/clamped to max
   }
 )
 

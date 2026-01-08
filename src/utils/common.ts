@@ -123,128 +123,86 @@ interface WaveformOptions {
    */
   max?: number
   /**
-   * Exponent for non-linear scaling
-   * > 1.0 increases contrast (quieter sounds get smaller, peaks stay high)
-   * < 1.0 boosts quiet sounds (compression)
-   * @default 2.5
+   * Percentile for determining the visual peak (0.0 to 1.0).
+   * 0.95 means the top 5% loudest peaks are ignored/clamped to max.
+   * Lower values = Fuller waveform, Less headroom.
+   * @default 0.95
    */
-  power?: number
+  amplitudePercentile?: number
 }
 
-/**
- * Creates a waveform generator function from raw audio data.
- * The generator produces normalized waveform blocks suitable for visualization.
- *
- * **NO CACHE BUILT-IN !!!**
- *
- * @param buffer - Raw audio data in ArrayBuffer format
- * @returns A generator function that creates waveform blocks
- *
- * @example
- * const generateWaveform = await createWaveformGenerator(file.arrayBuffer());
- * const waveform = generateWaveform(128, { min: 0.2, max: 0.8 });
- */
 export async function createWaveformGenerator(
   buffer: Promisable<ArrayBuffer>,
   globalOptions: WaveformOptions = {},
 ): Promise<(blockCount: number, options?: WaveformOptions) => Float32Array> {
-  const ctx = new OfflineAudioContext(1, 1, 44100)
+  const arrayBuffer = await Promise.resolve(buffer)
+  const offlineCtx = new OfflineAudioContext(1, 1, 44100)
+  const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer.slice(0))
 
-  // 1. Decode Audio
-  const audioData = await ctx.decodeAudioData(await buffer)
-  const channelData = audioData.getChannelData(0)
-  const sourceLen = channelData.length
+  const channelData = audioBuffer.getChannelData(0)
+  const totalSamples = channelData.length
 
-  // 2. Precompute Global Peak (Single pass scan)
-  // We do NOT create a new 'absData' array here to save RAM.
-  let globalPeak = 0
-  for (let i = 0; i < sourceLen; i++) {
-    const val = Math.abs(channelData[i])
-    if (val > globalPeak) {
-      globalPeak = val
-    }
-  }
+  // 1. Precompute RMS Blocks
+  const TARGET_PRECOMPUTE_BLOCKS = 2000
+  const precomputeBlockSize = Math.max(1, Math.ceil(totalSamples / TARGET_PRECOMPUTE_BLOCKS))
+  const precomputeBlockCount = Math.ceil(totalSamples / precomputeBlockSize)
+  const precomputedRMS = new Float32Array(precomputeBlockCount)
 
-  // Prevent division by zero if silence
-  if (globalPeak === 0) {
-    globalPeak = 1
-  }
+  for (let i = 0; i < precomputeBlockCount; i++) {
+    const start = i * precomputeBlockSize
+    const end = Math.min(start + precomputeBlockSize, totalSamples)
 
-  /**
-   * Generator Function
-   */
-  return (blockCount: number, options: WaveformOptions = {}) => {
-    const {
-      min = globalOptions.min || 0.1,
-      max = globalOptions.max || 0.9,
-      power = globalOptions.power || 2.5,
-    } = options
-
-    if (!Number.isInteger(blockCount) || blockCount <= 0) {
-      throw new RangeError(`Invalid block count: ${blockCount}. Must be positive integer.`)
+    let sumOfSquares = 0
+    for (let j = start; j < end; j++) {
+      const sample = channelData[j]
+      sumOfSquares += sample * sample
     }
 
-    if (min < 0 || max > 1 || min >= max) {
-      throw new RangeError(
-        `Invalid normalization range [${min}, ${max}]. Must satisfy 0 <= min < max <= 1.`,
+    const blockLen = end - start
+    precomputedRMS[i] = Math.sqrt(sumOfSquares / blockLen)
+  }
+
+  // 2. Calculate Reference Max (Percentile-based)
+  // Instead of absolute max, we take the 95th percentile (by default).
+  // This "pushes up" the body of the waveform and ignores extreme transient spikes.
+  const { amplitudePercentile = 0.95 } = globalOptions
+
+  // Sort a copy of the RMS data to find the percentile value
+  const sortedRMS = new Float32Array(precomputedRMS).sort()
+  const percentileIndex = Math.floor(sortedRMS.length * amplitudePercentile)
+  // Fallback for silence to prevent division by zero
+  const refMaxRMS = sortedRMS[percentileIndex] || 1
+
+  return (blockCount: number, options: WaveformOptions = {}): Float32Array => {
+    const { min = globalOptions.min ?? 0.1, max = globalOptions.max ?? 0.9 } = options
+    blockCount = Math.max(1, blockCount)
+
+    const scale = max - min
+    const result = new Float32Array(blockCount)
+
+    const ratio = precomputeBlockCount / blockCount
+
+    for (let i = 0; i < blockCount; i++) {
+      const startBlock = Math.floor(i * ratio)
+      const endBlock = Math.min(
+        Math.ceil((i + 1) * ratio),
+        precomputeBlockCount
       )
-    }
 
-    const output = new Float32Array(blockCount)
+      const range = endBlock - startBlock
+      let sumRMS = 0
 
-    // Calculate stride
-    // step: how many source samples per 1 output pixel
-    const step = sourceLen / blockCount
-
-    // Pre-calculate scale factor for the final output range
-    const range = max - min
-    const invGlobalPeak = 1 / globalPeak
-
-    // DOWNSAMPLING (Standard Case: Audio is longer than output pixels)
-    if (step >= 1) {
-      for (let i = 0; i < blockCount; i++) {
-        const start = Math.floor(i * step)
-        const end = Math.floor((i + 1) * step)
-
-        // Find Peak in chunk
-        let localPeak = 0
-        // Optimization: Use a while loop or check bounds safely
-        const safeEnd = end < sourceLen ? end : sourceLen
-
-        for (let j = start; j < safeEnd; j++) {
-          const val = Math.abs(channelData[j])
-          if (val > localPeak) {
-            localPeak = val
-          }
-        }
-
-        // Processing Pipeline:
-        // 1. Normalize (0 to 1) relative to song volume
-        let n = localPeak * invGlobalPeak
-
-        // 2. Apply Power Curve (Increases difference/contrast)
-        if (power !== 1) {
-          n = Math.pow(n, power)
-        }
-
-        // 3. Map to output range (min to max)
-        output[i] = min + n * range
+      for (let j = startBlock; j < endBlock; j++) {
+        sumRMS += precomputedRMS[j]
       }
-    }
-    // UPSAMPLING (Rare Case: Zoomed in extremely close)
-    else {
-      for (let i = 0; i < blockCount; i++) {
-        const index = Math.min(Math.floor(i * step), sourceLen - 1)
-        let n = Math.abs(channelData[index]) * invGlobalPeak
 
-        if (power !== 1) {
-          n = Math.pow(n, power)
-        }
+      const avgRMS = range > 0 ? sumRMS / range : 0
 
-        output[i] = min + n * range
-      }
+      // Normalize against the reference max (percentile peak) and clamp
+      let normalized = clamp(0, avgRMS / refMaxRMS, 1)
+      result[i] = min + normalized * scale
     }
 
-    return output
+    return result
   }
 }
