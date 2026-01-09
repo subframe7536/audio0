@@ -131,10 +131,15 @@ interface WaveformOptions {
   amplitudePercentile?: number
 }
 
+interface ResampleFn {
+  (blockCount: number, options?: Omit<WaveformOptions, 'amplitudePercentile'>): Float32Array
+  (dts: Float32Array, options?: Omit<WaveformOptions, 'amplitudePercentile'>): void
+}
+
 export async function createWaveformGenerator(
   buffer: Promisable<ArrayBuffer>,
   globalOptions: WaveformOptions = {},
-): Promise<(blockCount: number, options?: WaveformOptions) => Float32Array> {
+): Promise<ResampleFn> {
   const arrayBuffer = await Promise.resolve(buffer)
   const offlineCtx = new OfflineAudioContext(1, 1, 44100)
   const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer.slice(0))
@@ -173,12 +178,19 @@ export async function createWaveformGenerator(
   // Fallback for silence to prevent division by zero
   const refMaxRMS = sortedRMS[percentileIndex] || 1
 
-  return (blockCount: number, options: WaveformOptions = {}): Float32Array => {
+  return (data, options = {}) => {
     const { min = globalOptions.min ?? 0.1, max = globalOptions.max ?? 0.9 } = options
-    blockCount = Math.max(1, blockCount)
-
     const scale = max - min
-    const result = new Float32Array(blockCount)
+
+    let blockCount
+    let result
+    if (typeof data === 'number') {
+      blockCount = Math.max(1, data)
+      result = new Float32Array(blockCount)
+    } else {
+      blockCount = data.length
+      result = data
+    }
 
     const ratio = precomputeBlockCount / blockCount
 
