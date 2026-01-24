@@ -1,23 +1,11 @@
 {
-  "plugins": [
-    "eslint",
-    "import",
-    "jsdoc",
-    "jsx-a11y",
-    "unicorn",
-    "oxc",
-    "typescript",
-    "promise"
-  ],
+  "plugins": ["eslint", "import", "jsdoc", "jsx-a11y", "unicorn", "oxc", "typescript", "promise"],
   "categories": {
     "correctness": "error",
     "perf": "error"
   },
   "rules": {
-    "curly": [
-      "error",
-      "all"
-    ],
+    "curly": ["error", "all"],
     "func-style": [
       "error",
       "declaration",
@@ -31,10 +19,7 @@
     "no-await-in-loop": "allow",
     "promise/no-callback-in-promise": "allow",
     "array-callback-return": "error",
-    "eqeqeq": [
-      "error",
-      "smart"
-    ],
+    "eqeqeq": ["error", "smart"],
     "getter-return": "error",
     "import/named": "error",
     "for-direction": "error",

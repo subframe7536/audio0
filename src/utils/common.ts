@@ -1,5 +1,6 @@
 /* eslint-disable prefer-template */
 import type { Promisable } from '@subframe7536/type-utils'
+
 import type { Codecs } from '../types'
 
 export function getCodecs(): Codecs {
@@ -196,10 +197,7 @@ export async function createWaveformGenerator(
 
     for (let i = 0; i < blockCount; i++) {
       const startBlock = Math.floor(i * ratio)
-      const endBlock = Math.min(
-        Math.ceil((i + 1) * ratio),
-        precomputeBlockCount
-      )
+      const endBlock = Math.min(Math.ceil((i + 1) * ratio), precomputeBlockCount)
 
       const range = endBlock - startBlock
       let sumRMS = 0

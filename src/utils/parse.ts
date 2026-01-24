@@ -1,5 +1,6 @@
-import { bindEventListenerWithCleanup } from './common'
 import type { StreamBufferOptions, Track, TrackLike } from '../types'
+
+import { bindEventListenerWithCleanup } from './common'
 
 async function waitForUpdate(source: SourceBuffer): Promise<void> {
   if (source.updating) {

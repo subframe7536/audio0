@@ -563,7 +563,9 @@ function initWaveformDemo() {
 
       // Generate waveform data
       console.time('Waveform Generation')
-      state.currentWaveform = await createWaveformGenerator(arrayBuffer).then(calc => Array.from(calc(100)))
+      state.currentWaveform = await createWaveformGenerator(arrayBuffer).then((calc) =>
+        Array.from(calc(100)),
+      )
       console.timeEnd('Waveform Generation')
 
       // Render waveform

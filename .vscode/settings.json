@@ -5,8 +5,7 @@
     "source.organizeImports": "never"
   },
   "editor.formatOnSave": true,
-  "oxc.fmt.experimental": true,
-  "[typescript]": {
-    "editor.defaultFormatter": "oxc.oxc-vscode"
-  },
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "oxc.path.oxfmt": "node_modules/.bin/oxfmt",
+  "oxc.path.oxlint": "node_modules/.bin/oxlint"
 }

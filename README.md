@@ -20,12 +20,15 @@ Modern audio library for browsers with automatic fade effects, media session sup
 ```bash
 npm install audio0
 ```
+
 ```bash
 yarn add audio0
 ```
+
 ```bash
 pnpm add audio0
 ```
+
 ```bash
 bun add audio0
 ```
@@ -56,7 +59,7 @@ audio.on('error', (error, code) => {
 await audio.load({
   src: './audio.mp3',
   title: 'My Song',
-  artist: 'Artist Name'
+  artist: 'Artist Name',
 })
 await audio.play()
 ```
@@ -71,20 +74,20 @@ const player = new ZPlayer({
     {
       src: './song1.mp3',
       title: 'Song 1',
-      artist: 'Artist 1'
+      artist: 'Artist 1',
     },
     {
-      src: () => fetch('./song2.mp3').then(r => r.body!),
+      src: () => fetch('./song2.mp3').then((r) => r.body!),
       mimeType: 'audio/mpeg',
       title: 'Song 2',
-      artist: 'Artist 2'
+      artist: 'Artist 2',
     },
     {
-      src: () => fetch('./song3.wav').then(r => r.arrayBuffer()),
+      src: () => fetch('./song3.wav').then((r) => r.arrayBuffer()),
       mimeType: 'audio/wav',
       title: 'Song 3',
-      artist: 'Artist 3'
-    }
+      artist: 'Artist 3',
+    },
   ],
   autoNext: true,
   loopMode: 'list',
@@ -123,7 +126,7 @@ const audio = new ZAudio({
     })
 
     return eq.nodes()
-  }
+  },
 })
 
 // Or handle context dynamically
@@ -152,7 +155,7 @@ const response = await fetch('./audio.mp3')
 const [track2, cleanup2] = await parseTrack(response.body!, 'audio/mpeg')
 
 // For buffers
-const buffer = await fetch('./audio.wav').then(r => r.arrayBuffer())
+const buffer = await fetch('./audio.wav').then((r) => r.arrayBuffer())
 const [track3, cleanup3] = await parseTrack(buffer, 'audio/wav')
 
 // Don't forget to cleanup
@@ -172,14 +175,11 @@ const arrayBuffer = await response.arrayBuffer()
 const resample = await createWaveformGenerator(arrayBuffer)
 
 // Generate waveform data
-const waveformData = resample(
-  48,
-  {
-    min: 0.1, // Minimum normalized value
-    max: 0.9, // Maximum normalized value
-    amplitudePercentile: 0.99 // Top 1% loudest peaks are ignored/clamped to max
-  }
-)
+const waveformData = resample(48, {
+  min: 0.1, // Minimum normalized value
+  max: 0.9, // Maximum normalized value
+  amplitudePercentile: 0.99, // Top 1% loudest peaks are ignored/clamped to max
+})
 
 // Use waveformData for visualization
 ```
@@ -192,16 +192,16 @@ import { ZPlayer, weightedShuffle, createSmartShuffle } from 'audio0'
 const customShuffle = createSmartShuffle({
   factor: (score) => 5 - score, // custom weight factor
   getSeed: () => 1, // custom seed
-  desc: true // custom sort direction
+  desc: true, // custom sort direction
 })
 
 const player = new ZPlayer({
   // Or shuffleFn: customShuffle,
   shuffleFn: weightedShuffle,
-  trackList: tracks.map(track => ({
+  trackList: tracks.map((track) => ({
     ...track,
-    score: calculateTrackScore(track) // Your scoring logic
-  }))
+    score: calculateTrackScore(track), // Your scoring logic
+  })),
 })
 ```
 
@@ -211,15 +211,15 @@ const player = new ZPlayer({
 
 ```ts
 interface ZAudioOptions {
-  fadeDuration?: number        // Fade duration in ms (default: 500)
-  volume?: number             // Initial volume 0-1 (default: 0.5)
-  mediaSession?: boolean      // Enable media session (default: false)
-  timeout?: number           // Load timeout in ms (default: 10000)
-  retryCount?: number        // Network retry attempts (default: 3)
-  retryDelay?: number        // Retry delay in ms (default: 1000)
-  autoUnlock?: boolean       // Auto unlock on mobile (default: true)
-  autoSuspend?: boolean      // Auto suspend when paused (default: false)
-  autoSuspendDelay?: number  // Suspend delay in ms (default: 30000)
+  fadeDuration?: number // Fade duration in ms (default: 500)
+  volume?: number // Initial volume 0-1 (default: 0.5)
+  mediaSession?: boolean // Enable media session (default: false)
+  timeout?: number // Load timeout in ms (default: 10000)
+  retryCount?: number // Network retry attempts (default: 3)
+  retryDelay?: number // Retry delay in ms (default: 1000)
+  autoUnlock?: boolean // Auto unlock on mobile (default: true)
+  autoSuspend?: boolean // Auto suspend when paused (default: false)
+  autoSuspendDelay?: number // Suspend delay in ms (default: 30000)
   getAudioContext?: () => AudioContext
   extraAudioNodes?: (ctx: AudioContext) => AudioNode[]
 }
@@ -229,9 +229,9 @@ interface ZAudioOptions {
 
 ```ts
 interface ZPlayerOptions extends ZAudioOptions {
-  trackList?: TrackLike[]           // Initial track list
-  shuffleFn?: ShuffleFn            // Custom shuffle function
-  autoNext?: boolean | LoadOptions  // Auto play next track
+  trackList?: TrackLike[] // Initial track list
+  shuffleFn?: ShuffleFn // Custom shuffle function
+  autoNext?: boolean | LoadOptions // Auto play next track
   loopMode?: 'list' | 'single' | 'random'
   preload?: boolean | PreloadConfig // Preload configuration
 }
@@ -248,7 +248,7 @@ interface Track {
   album?: string
   artwork?: MediaImage[]
   mimeType?: string
-  score?: number  // For weighted shuffle
+  score?: number // For weighted shuffle
 }
 
 // File track (from an <input /> File)
@@ -295,26 +295,24 @@ player.on('reorder', () => {})
 // Audio buffer processing
 function normalizeAudioBuffer(
   buf: AudioBuffer,
-  blockNum?: number,    // Result block amount (default: 1000)
-  max?: number,         // Max value 0-1 (default: 0.9)
-  min?: number          // Min value 0-1 (default: 0.1)
+  blockNum?: number, // Result block amount (default: 1000)
+  max?: number, // Max value 0-1 (default: 0.9)
+  min?: number, // Min value 0-1 (default: 0.1)
 ): number[]
 
 // Equalizer creation
 function createEqualizer<T extends readonly number[]>(
   ctx: AudioContext,
-  freq: T,              // Frequency array (use defaultFreq)
-  handleNode?: (band: BiquadFilterNode, freq: T[number], index: number) => void
+  freq: T, // Frequency array (use defaultFreq)
+  handleNode?: (band: BiquadFilterNode, freq: T[number], index: number) => void,
 ): EQ<T>
 
 // Shuffle algorithms
-function createWeightedArtistShuffle(
-  getLimit?: (totalArtists: number) => number
-): ShuffleIndexFn
+function createWeightedArtistShuffle(getLimit?: (totalArtists: number) => number): ShuffleIndexFn
 
 function parseTrack(
   track: TrackLike,
-  onError?: (msg: string) => void
+  onError?: (msg: string) => void,
 ): Promise<[track: Track, cleanup: VoidFunction]>
 
 // Helper functions
@@ -322,7 +320,7 @@ function bindEventListenerWithCleanup(
   el: EventTarget,
   type: string,
   handler: EventListener,
-  options?: boolean | AddEventListenerOptions
+  options?: boolean | AddEventListenerOptions,
 ): VoidFunction
 
 function secondToTime(second: number): string
@@ -343,12 +341,12 @@ function clamp(min: number, val: number, max: number): number
 audio.on('error', (error, code) => {
   switch (code) {
     case -1: // Internal logic error
-    case 0:  // Unknown load error
-    case 1:  // MEDIA_ERR_ABORTED
-    case 2:  // MEDIA_ERR_NETWORK (auto-retry enabled)
-    case 3:  // MEDIA_ERR_DECODE
-    case 4:  // MEDIA_ERR_SRC_NOT_SUPPORTED
-    case 5:  // Stream load error
+    case 0: // Unknown load error
+    case 1: // MEDIA_ERR_ABORTED
+    case 2: // MEDIA_ERR_NETWORK (auto-retry enabled)
+    case 3: // MEDIA_ERR_DECODE
+    case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
+    case 5: // Stream load error
       console.error(`Audio error (${code}):`, error.message)
       break
   }

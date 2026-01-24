@@ -1,3 +1,7 @@
+import type { Promisable } from '@subframe7536/type-utils'
+
+import { Mitt } from 'zen-mitt/class'
+
 import type {
   Codecs,
   LoadingState,
@@ -7,9 +11,6 @@ import type {
   ZAudioEvents,
   ZAudioOptions,
 } from './types'
-import type { Promisable } from '@subframe7536/type-utils'
-
-import { Mitt } from 'zen-mitt/class'
 
 import { ZAudioError } from './types'
 import { bindEventListenerWithCleanup, clamp, formatVolume, getCodecs, sleep } from './utils/common'
