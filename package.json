@@ -1,6 +1,6 @@
 {
   "name": "audio0",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Audio library for the modern browser, auto cross fade",
   "keywords": [
     "audio",
