@@ -40,11 +40,11 @@ export const weightedShuffle: ShuffleFn = (array: TrackInfo[]) => {
   // Single pass: initialize indices and compute weights
   for (let i = 0; i < len; i++) {
     result[i] = i
-    weights[i] = Math.random() * (array[i].score ?? 3)
+    weights[i] = Math.random() * (array[i]?.score ?? 3)
   }
 
   // Sort indices by weights in descending order
-  result.sort((a, b) => weights[b] - weights[a])
+  result.sort((a, b) => weights[b]! - weights[a]!)
 
   return result
 }
@@ -58,8 +58,8 @@ interface SmartShuffleOptions {
 export function createSmartShuffle(options: SmartShuffleOptions = {}): ShuffleFn {
   const { getSeed = () => Date.now(), factor = () => 1, desc = false } = options
   const sortFn: (pos: Float64Array, a: number, b: number) => number = desc
-    ? (pos, a, b) => pos[b] - pos[a]
-    : (pos, a, b) => pos[a] - pos[b]
+    ? (pos, a, b) => pos[b]! - pos[a]!
+    : (pos, a, b) => pos[a]! - pos[b]!
   return (songs: TrackInfo[]) => {
     const len = songs.length
     if (len <= 1) {
@@ -72,7 +72,7 @@ export function createSmartShuffle(options: SmartShuffleOptions = {}): ShuffleFn
 
     for (let i = 0; i < len; i++) {
       result[i] = i
-      const artist = songs[i].artist || 'DEFAULT'
+      const artist = songs[i]?.artist || 'DEFAULT'
       let indices = artistsMap.get(artist)
       if (!indices) {
         indices = []
@@ -100,8 +100,9 @@ export function createSmartShuffle(options: SmartShuffleOptions = {}): ShuffleFn
       // 6. Calculate positions
       for (let i = 0; i < count; i++) {
         const randomJitter = (Math.random() * 0.1) / count
-        positions[artistItems[i]] =
-          ((artistBaseOffset + i / count + randomJitter) % 1) * factor(songs[artistItems[i]].score)
+        const songIndex = artistItems[i]!
+        positions[songIndex] =
+          ((artistBaseOffset + i / count + randomJitter) % 1) * factor(songs[songIndex]?.score)
       }
     }
 
@@ -115,7 +116,7 @@ export function createSmartShuffle(options: SmartShuffleOptions = {}): ShuffleFn
 function stringHash(str: string): number {
   let hash = 0
   for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i)
+    hash = (hash << 5) - hash + (str.codePointAt(i) ?? 0)
     hash |= 0
   }
   return Math.abs(hash) / 2147483647

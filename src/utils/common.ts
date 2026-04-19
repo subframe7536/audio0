@@ -10,7 +10,9 @@ export function getCodecs(): Codecs {
   const ua = globalThis.navigator.userAgent
   const isSafari = ua.includes('Safari') && !ua.includes('Chrome')
   const safariVersion = ua.match(/Version\/(.*?) /)
-  const isOldSafari = isSafari && safariVersion && Number.parseInt(safariVersion[1]) < 16
+  const safariMajorVersion = safariVersion?.[1]
+  const isOldSafari =
+    isSafari && safariMajorVersion !== undefined && Number.parseInt(safariMajorVersion) < 16
 
   const mpegTest = checkAudioMime('mpeg')
   const aacTest = checkAudioMime('aac')
@@ -98,16 +100,16 @@ export function normalizeAudioBuffer(
     const start = i * blockSize
 
     for (let j = start; j < start + blockSize; j++) {
-      sum += Math.abs(rawData[j])
+      sum += Math.abs(rawData[j]!)
     }
 
     result[i] = sum / blockSize
-    tempMax = Math.max(tempMax, result[i])
+    tempMax = Math.max(tempMax, result[i]!)
   }
 
   // use fori to avoid array copy
   for (let i = 0; i < blockNum; i++) {
-    result[i] = Math.round(Math.max((result[i] * max) / tempMax, min) * 1e5) / 1e5
+    result[i] = Math.round(Math.max((result[i]! * max) / tempMax, min) * 1e5) / 1e5
   }
   return result
 }
@@ -160,7 +162,7 @@ export async function createWaveformGenerator(
 
     let sumOfSquares = 0
     for (let j = start; j < end; j++) {
-      const sample = channelData[j]
+      const sample = channelData[j]!
       sumOfSquares += sample * sample
     }
 
@@ -203,7 +205,7 @@ export async function createWaveformGenerator(
       let sumRMS = 0
 
       for (let j = startBlock; j < endBlock; j++) {
-        sumRMS += precomputedRMS[j]
+        sumRMS += precomputedRMS[j]!
       }
 
       const avgRMS = range > 0 ? sumRMS / range : 0

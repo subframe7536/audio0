@@ -33,8 +33,8 @@ export function createEqualizer<T extends readonly number[] | number[]>(
       default:
         band.type = 'peaking'
     }
-    band.frequency.value = freq[i]
-    handleNode?.(band, freq[i], i)
+    band.frequency.value = freq[i]!
+    handleNode?.(band, freq[i]!, i)
     result.push(band)
   }
 
@@ -43,7 +43,7 @@ export function createEqualizer<T extends readonly number[] | number[]>(
     handle: (targetFreq: T[number], fn: (band: BiquadFilterNode) => void) => {
       const index = freq.indexOf(targetFreq)
       if (index !== -1) {
-        fn(result[index])
+        fn(result[index]!)
       }
     },
   }

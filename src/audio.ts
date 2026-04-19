@@ -1,5 +1,4 @@
 import type { Promisable } from '@subframe7536/type-utils'
-
 import { Mitt } from 'zen-mitt/class'
 
 import type {
@@ -11,7 +10,6 @@ import type {
   ZAudioEvents,
   ZAudioOptions,
 } from './types'
-
 import { ZAudioError } from './types'
 import { bindEventListenerWithCleanup, clamp, formatVolume, getCodecs, sleep } from './utils/common'
 
@@ -240,7 +238,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     this.emit('fadeDuration', duration)
   }
 
-  protected emitError(error: ZAudioError): false
+  protected emitError(cause: ZAudioError): false
   protected emitError(msg: string, code?: ZAudioErrorCode): false
   protected emitError(data: string | ZAudioError, code?: ZAudioErrorCode): false {
     this.state = 'error'
@@ -327,7 +325,7 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
         audio.load()
       }).catch((e) =>
         this.emitError(
-          e instanceof ZAudioError ? e : new ZAudioError(-1, 'Unknown load error: ' + e),
+          e instanceof ZAudioError ? e : new ZAudioError(-1, `Unknown load error: ${e}`),
         ),
       )
       _cleanup?.()
@@ -350,9 +348,10 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
       this.emitError('Cannot extract extension from blob URL without MIME type')
       return undefined
     }
+    const sourceWithoutQuery = newSrc.split('?', 1)[0] ?? newSrc
     return (
       mimeType?.split('/')[1]?.split(';')[0] ||
-      newSrc.split('?', 1)[0].match(/\.([^.]+)$/)?.[1] ||
+      sourceWithoutQuery.match(/\.([^.]+)$/)?.[1] ||
       newSrc.match(/^data:audio\/([^;]+);/i)?.[1]
     )
   }
@@ -393,9 +392,9 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
         return
       }
 
-      this.sourceNode!.connect(nodes[0])
+      this.sourceNode!.connect(nodes[0]!)
       nodes.reduce((prev, curr) => (prev.connect(curr), curr))
-      nodes[nodes.length - 1].connect(this.gainNode!)
+      nodes[nodes.length - 1]!.connect(this.gainNode!)
       this.nodes = nodes
     }
 

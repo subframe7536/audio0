@@ -26,7 +26,7 @@ class BufferPool {
    * Get a buffer from the pool or create a new one
    */
   acquire(size: number): ArrayBuffer {
-    const poolSize = this.getNearestPoolSize(size)
+    const poolSize = getNearestPoolSize(size)
     const pool = this.pools.get(poolSize) || []
 
     if (pool.length > 0) {
@@ -41,7 +41,7 @@ class BufferPool {
    */
   release(buffer: ArrayBuffer): void {
     const size = buffer.byteLength
-    const poolSize = this.getNearestPoolSize(size)
+    const poolSize = getNearestPoolSize(size)
 
     // Only pool if it matches a standard size and pool isn't full
     if (size === poolSize) {
@@ -59,17 +59,16 @@ class BufferPool {
   clear(): void {
     this.pools.clear()
   }
-
-  private getNearestPoolSize(size: number): number {
-    // Find the smallest standard size that can fit the requested size
-    for (const standardSize of STANDARD_SIZE) {
-      if (size <= standardSize) {
-        return standardSize
-      }
+}
+function getNearestPoolSize(size: number): number {
+  // Find the smallest standard size that can fit the requested size
+  for (const standardSize of STANDARD_SIZE) {
+    if (size <= standardSize) {
+      return standardSize
     }
-    // For very large sizes, round up to nearest MB
-    return Math.ceil(size / MB_1) * MB_1
   }
+  // For very large sizes, round up to nearest MB
+  return Math.ceil(size / MB_1) * MB_1
 }
 
 /**
@@ -277,7 +276,10 @@ export function createUrlFromStream(
 
   // Process pending transferable buffers in chunks optimized for audio
   const processPendingBuffers = async (): Promise<void> => {
-    while (pendingBuffers.length > 0 && isSourceBufferReady() && isStreamingActive) {
+    while (pendingBuffers.length > 0 && isSourceBufferReady()) {
+      if (!isStreamingActive) {
+        break
+      }
       const transferableBuffer = pendingBuffers.shift()!
       await appendBufferSafely(transferableBuffer)
     }
@@ -314,16 +316,20 @@ export function createUrlFromStream(
         let accumulatedData: Uint8Array[] = []
         let accumulatedSize = 0
 
-        while (isStreamingActive && isMediaStreamOpen()) {
+        while (isMediaStreamOpen()) {
+          if (!isStreamingActive) {
+            break
+          }
           const { done, value } = await reader.read()
 
           if (done) {
             // Process any remaining accumulated data
             if (accumulatedSize > 0) {
-              if (accumulatedData.length === 1 && canUseZeroCopy(accumulatedData[0])) {
+              const firstChunk = accumulatedData[0]
+              if (accumulatedData.length === 1 && firstChunk && canUseZeroCopy(firstChunk)) {
                 // Zero-copy: use the ArrayBuffer directly
                 const transferableBuffer = createTransferableBufferFromArrayBuffer(
-                  accumulatedData[0].buffer as ArrayBuffer,
+                  firstChunk.buffer as ArrayBuffer,
                 )
                 pendingBuffers.push(transferableBuffer)
               } else {
@@ -383,10 +389,11 @@ export function createUrlFromStream(
                     2) // Low buffer threshold
 
               if (shouldFlushBuffer) {
-                if (accumulatedData.length === 1 && canUseZeroCopy(accumulatedData[0])) {
+                const firstChunk = accumulatedData[0]
+                if (accumulatedData.length === 1 && firstChunk && canUseZeroCopy(firstChunk)) {
                   // Zero-copy: use the ArrayBuffer directly
                   const transferableBuffer = createTransferableBufferFromArrayBuffer(
-                    accumulatedData[0].buffer as ArrayBuffer,
+                    firstChunk.buffer as ArrayBuffer,
                   )
                   pendingBuffers.push(transferableBuffer)
                 } else {
@@ -537,7 +544,7 @@ export async function parseTrack(
   } else if (src instanceof ReadableStream) {
     result = parseTrackFromStream(src, track.mimeType!, onError, options)
   } else {
-    throw new Error('Unsupported track source type')
+    throw new TypeError('Unsupported track source type')
   }
 
   return [{ ...track, ...result[0] }, result[1]]

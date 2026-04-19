@@ -5,6 +5,7 @@ import {
   createSmartShuffle,
   secondToTime,
 } from '../src/utils'
+
 import mp3 from './test.mp3?url'
 import ogg from './test.ogg?url'
 
@@ -94,7 +95,7 @@ function initGlobalControls() {
   })
 
   globalVolumeSlider.addEventListener('input', () => {
-    const volume = parseInt(globalVolumeSlider.value) / 100
+    const volume = Number.parseInt(globalVolumeSlider.value) / 100
     const currentAudio = state.currentAudioSource === 'player' ? state.player : state.singleAudio
     if (currentAudio) {
       currentAudio.volume = volume
@@ -155,7 +156,7 @@ function initSingleAudioDemo() {
 
   state.singleAudio.on('timeupdate', (time) => {
     const duration = state.singleAudio!.duration
-    if (duration && !isNaN(duration)) {
+    if (duration && !Number.isNaN(duration)) {
       status.textContent = `⏱️ ${secondToTime(time)} / ${secondToTime(duration)}`
       if (state.currentAudioSource === 'single') {
         updateGlobalProgress(time, duration)
@@ -206,7 +207,7 @@ function initSingleAudioDemo() {
 
   // Slider handlers
   volumeSlider.addEventListener('input', () => {
-    const volume = parseInt(volumeSlider.value) / 100
+    const volume = Number.parseInt(volumeSlider.value) / 100
     state.singleAudio!.volume = volume
     volumeDisplay.textContent = `${volumeSlider.value}%`
 
@@ -216,7 +217,7 @@ function initSingleAudioDemo() {
   })
 
   fadeSlider.addEventListener('input', () => {
-    const duration = parseInt(fadeSlider.value)
+    const duration = Number.parseInt(fadeSlider.value)
     state.singleAudio!.fadeDuration = duration
     fadeDisplay.textContent = `${duration}ms`
   })
@@ -305,7 +306,7 @@ function initPlayerDemo() {
 
   state.player.on('timeupdate', (time) => {
     const duration = state.player!.duration
-    if (duration && !isNaN(duration) && state.currentAudioSource === 'player') {
+    if (duration && !Number.isNaN(duration) && state.currentAudioSource === 'player') {
       updateGlobalProgress(time, duration)
     }
   })
@@ -459,9 +460,9 @@ function initEqualizerDemo() {
         currentAudio.handleContext((ctx) => {
           state.equalizer = createEqualizer(ctx, [60, 250, 1000, 4000, 16000], (band, freq) => {
             // Find the slider for this frequency and apply its current value
-            const slider = sliderList.find((s) => parseInt(s.dataset.freq!) === freq)
+            const slider = sliderList.find((s) => Number.parseInt(s.dataset.freq!) === freq)
             if (slider) {
-              const gain = parseFloat(slider.value)
+              const gain = Number.parseFloat(slider.value)
               band.gain.value = gain
             } else {
               band.gain.value = 0 // Default to 0dB if no slider found
@@ -503,8 +504,8 @@ function initEqualizerDemo() {
   sliders.forEach((slider) => {
     slider.addEventListener('input', () => {
       if (state.equalizer && isEnabled) {
-        const freq = parseInt(slider.dataset.freq!)
-        const gain = parseFloat(slider.value)
+        const freq = Number.parseInt(slider.dataset.freq!)
+        const gain = Number.parseFloat(slider.value)
         state.equalizer.handle(freq, (band: BiquadFilterNode) => {
           band.gain.value = gain
         })
@@ -523,17 +524,21 @@ function initEqualizerDemo() {
 
   function applyPreset(values: number[]) {
     values.forEach((value, index) => {
-      sliders[index].value = value.toString()
+      const slider = sliders[index]
+      if (!slider) {
+        return
+      }
+      slider.value = value.toString()
 
       // Update value display
-      const eqBand = sliders[index].closest('.eq-band')
+      const eqBand = slider.closest('.eq-band')
       const valueDisplay = eqBand?.querySelector('.eq-value')
       if (valueDisplay) {
         valueDisplay.textContent = `${value > 0 ? '+' : ''}${value}dB`
       }
 
       if (state.equalizer && isEnabled) {
-        const freq = parseInt(sliders[index].dataset.freq!)
+        const freq = Number.parseInt(slider.dataset.freq!)
         state.equalizer.handle(freq, (band: BiquadFilterNode) => {
           band.gain.value = value
         })

@@ -1,3 +1,4 @@
+import { ZAudio } from './audio'
 import type {
   LoadOptions,
   LoopMode,
@@ -9,8 +10,6 @@ import type {
   ZPlayerEvents,
   ZPlayerOptions,
 } from './types'
-
-import { ZAudio } from './audio'
 import { LOOP_MODE } from './types'
 import { defaultShuffle, parseTrack } from './utils'
 
@@ -64,11 +63,13 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
   }
 
   get currentTrack(): TrackLike {
-    return this._trackList[this._orderList[this._curIdx]]
+    return this._trackList[this._orderList[this._curIdx]!]!
   }
 
   get trackList(): TrackLike[] {
-    return this._orderList.map((i) => this._trackList[i])
+    return this._orderList
+      .map((i) => this._trackList[i])
+      .filter((track): track is TrackLike => track !== undefined)
   }
 
   set trackList(list: TrackLike[]) {
@@ -77,7 +78,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
   }
 
   get loopMode(): LoopMode {
-    return LOOP_MODE[this._loopMode]
+    return LOOP_MODE[this._loopMode]!
   }
 
   /**
@@ -94,7 +95,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
     if (index < 0 || (this.trackList.length && index >= this.trackList.length)) {
       return this.emitError(`Invalid track index: ${index}`)
     }
-    const track = this.trackList[this._orderList[index]]
+    const track = this.trackList[index]
     if (!track) {
       return this.emitError('No track data, please load track first')
     }
@@ -314,7 +315,7 @@ export class ZPlayer extends ZAudio<ZPlayerEvents> {
     return { ...this.streamBuffer }
   }
 
-  public async destroy(): Promise<void> {
+  public override async destroy(): Promise<void> {
     this._cleanup?.()
     this.cleanupPreloadedTrack()
     await super.destroy()
