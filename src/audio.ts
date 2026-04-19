@@ -615,39 +615,31 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
       return
     }
 
-    const unlock = () => {
-      if (this._audioUnlocked) {
-        return
-      }
-
-      if (this.ctx!.state === 'suspended') {
-        this.ctx!.resume()
-          .then(() => {
-            this._audioUnlocked = true
-            this._clearUnlock()
-          })
-          .catch(() => {
-            // Retry on next interaction
-          })
-      } else {
-        this._audioUnlocked = true
-        this._clearUnlock()
-      }
-    }
-
     // Listen for user interactions with capture phase
-    const cleanup1 = bindEventListenerWithCleanup(document, 'touchstart', unlock, true)
-    const cleanup2 = bindEventListenerWithCleanup(document, 'touchend', unlock, true)
-    const cleanup3 = bindEventListenerWithCleanup(document, 'click', unlock, true)
-    const cleanup4 = bindEventListenerWithCleanup(document, 'keydown', unlock, true)
+    this._unlockCleanup = bindEventListenerWithCleanup(
+      document,
+      ['touchstart', 'touchend', 'click', 'keydown'],
+      () => {
+        if (this._audioUnlocked) {
+          return
+        }
 
-    // Store combined cleanup function
-    this._unlockCleanup = () => {
-      cleanup1()
-      cleanup2()
-      cleanup3()
-      cleanup4()
-    }
+        if (this.ctx!.state === 'suspended') {
+          this.ctx!.resume()
+            .then(() => {
+              this._audioUnlocked = true
+              this._clearUnlock()
+            })
+            .catch(() => {
+              // Retry on next interaction
+            })
+        } else {
+          this._audioUnlocked = true
+          this._clearUnlock()
+        }
+      },
+      true,
+    )
   }
 
   /**

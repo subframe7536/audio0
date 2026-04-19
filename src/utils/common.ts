@@ -40,12 +40,19 @@ export function getCodecs(): Codecs {
 
 export function bindEventListenerWithCleanup(
   el: EventTarget,
-  type: string,
+  type: string | readonly string[],
   handler: EventListener,
   options?: boolean | AddEventListenerOptions,
 ): VoidFunction {
-  el.addEventListener(type, handler, options)
-  return () => el.removeEventListener(type, handler, options)
+  const eventTypes = Array.isArray(type) ? type : [type]
+  eventTypes.forEach((eventType) => {
+    el.addEventListener(eventType, handler, options)
+  })
+  return () => {
+    eventTypes.forEach((eventType) => {
+      el.removeEventListener(eventType, handler, options)
+    })
+  }
 }
 export function clamp(min: number, val: number, max: number): number {
   return Math.min(Math.max(min, val), max)
