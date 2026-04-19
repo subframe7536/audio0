@@ -1,7 +1,6 @@
 /* eslint-disable prefer-template */
-import type { Promisable } from '@subframe7536/type-utils'
 
-import type { Codecs } from '../types'
+import type { Codecs, Promisable } from '../types'
 
 export function getCodecs(): Codecs {
   let testAudio = new Audio()

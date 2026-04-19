@@ -1,5 +1,4 @@
-import type { Promisable } from '@subframe7536/type-utils'
-
+export type Promisable<T> = T | Promise<T>
 /**
  * Audio error code
  *

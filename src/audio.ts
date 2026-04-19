@@ -1,10 +1,10 @@
-import type { Promisable } from '@subframe7536/type-utils'
 import { Mitt } from 'zen-mitt/class'
 
 import type {
   Codecs,
   LoadingState,
   LoadOptions,
+  Promisable,
   Track,
   ZAudioErrorCode,
   ZAudioEvents,
