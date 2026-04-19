@@ -190,8 +190,10 @@ export function createUrlFromStream(
   let sourceBuffer: SourceBuffer | null = null
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
   let isStreamingActive = true
+  let isCleanedUp = false
   let totalBufferedBytes = 0
   let pendingBuffers: TransferableBuffer[] = []
+  let cleanupBufferUpdateListener: VoidFunction | undefined
 
   // Memory pool for buffer reuse
   const bufferPool = new BufferPool()
@@ -307,11 +309,15 @@ export function createUrlFromStream(
         }
 
         // Set up buffer monitoring for audio streaming
-        const bufferUpdateListener = bindEventListenerWithCleanup(sourceBuffer, 'updateend', () => {
-          if (isStreamingActive) {
-            void processPendingBuffers()
-          }
-        })
+        cleanupBufferUpdateListener = bindEventListenerWithCleanup(
+          sourceBuffer,
+          'updateend',
+          () => {
+            if (isStreamingActive) {
+              void processPendingBuffers()
+            }
+          },
+        )
 
         let accumulatedData: Uint8Array[] = []
         let accumulatedSize = 0
@@ -351,7 +357,6 @@ export function createUrlFromStream(
             if (isMediaStreamOpen() && isStreamingActive) {
               ms.endOfStream()
             }
-            bufferUpdateListener()
             return
           }
 
@@ -422,6 +427,8 @@ export function createUrlFromStream(
           onError?.(err instanceof Error ? err.message : String(err))
         }
       } finally {
+        cleanupBufferUpdateListener?.()
+        cleanupBufferUpdateListener = undefined
         isStreamingActive = false
         if (reader) {
           try {
@@ -438,8 +445,15 @@ export function createUrlFromStream(
   return [
     url,
     () => {
+      if (isCleanedUp) {
+        return
+      }
+
+      isCleanedUp = true
       isStreamingActive = false
       cleanupListener()
+      cleanupBufferUpdateListener?.()
+      cleanupBufferUpdateListener = undefined
 
       // Cancel the reader if still active
       if (reader) {
@@ -455,6 +469,7 @@ export function createUrlFromStream(
           sourceBuffer.abort()
         } catch {}
       }
+      sourceBuffer = null
 
       // End media source
       if (isMediaStreamOpen()) {

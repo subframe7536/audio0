@@ -245,7 +245,8 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
     if (data instanceof ZAudioError) {
       this.emit('error', data, data.code)
     } else {
-      this.emit('error', new ZAudioError(code!, data), code!)
+      const resolvedCode = code ?? -1
+      this.emit('error', new ZAudioError(resolvedCode, data), resolvedCode)
     }
     return false
   }
@@ -442,10 +443,10 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
         this.ses.metadata = new MediaMetadata(metadata)
       }
       this.state = 'loaded'
+      if (typeof options.startTime === 'number') {
+        await this.seek(options.startTime)
+      }
       if (autoPlay) {
-        if (options.startTime) {
-          await this.seek(options.startTime)
-        }
         return await this.play()
       }
       return loadResult
@@ -577,7 +578,12 @@ export class ZAudio<T extends ZAudioEvents = ZAudioEvents> extends Mitt<T> {
    * Destroy instance
    */
   public async destroy(): Promise<void> {
+    if (!this.audio) {
+      return
+    }
+
     this._clearAutoSuspend()
+    this._clearUnlock()
     await this.stop()
     await this.ctx?.close()
     if (this.ses) {
