@@ -3,38 +3,59 @@
 import type { Codecs, Promisable } from '../types'
 
 export function getCodecs(): Codecs {
-  let testAudio = new Audio()
-  const checkAudioMime = (mime: string): boolean => !!testAudio.canPlayType('audio/' + mime)
+  const AudioCtor = globalThis.Audio
+  if (typeof AudioCtor === 'undefined') {
+    return new Set()
+  }
 
-  const ua = globalThis.navigator.userAgent
+  let testAudio: HTMLAudioElement
+  try {
+    testAudio = new AudioCtor()
+  } catch {
+    return new Set()
+  }
+
+  if (typeof testAudio.canPlayType !== 'function') {
+    return new Set()
+  }
+
+  const checkAudioMime = (mime: string): boolean =>
+    testAudio.canPlayType(`audio/${mime};`).replace(/^no$/, '') !== ''
+
+  const ua = globalThis.navigator?.userAgent ?? ''
   const isSafari = ua.includes('Safari') && !ua.includes('Chrome')
   const safariVersion = ua.match(/Version\/(.*?) /)
   const safariMajorVersion = safariVersion?.[1]
   const isOldSafari =
-    isSafari && safariMajorVersion !== undefined && Number.parseInt(safariMajorVersion) < 16
+    isSafari && safariMajorVersion !== undefined && Number.parseInt(safariMajorVersion) < 15
 
   const mpegTest = checkAudioMime('mpeg')
+  const oggVorbisTest = checkAudioMime('ogg; codecs="vorbis"')
   const aacTest = checkAudioMime('aac')
-  const resultSet: Codecs = new Set(
+  const mp4Test = checkAudioMime('mp4') || checkAudioMime('aac')
+  const webmVorbisTest = !isOldSafari && checkAudioMime('webm; codecs="vorbis"')
+
+  return new Set(
     Object.entries({
       mp3: mpegTest || checkAudioMime('mp3'),
       mpeg: mpegTest,
-      opus: checkAudioMime('ogg;codecs="opus"'),
-      ogg: checkAudioMime('ogg;codecs="vorbis"'),
+      opus: checkAudioMime('ogg; codecs="opus"'),
+      ogg: oggVorbisTest,
+      oga: oggVorbisTest,
+      wav: checkAudioMime('wav; codecs="1"') || checkAudioMime('wav'),
       aac: aacTest,
+      caf: checkAudioMime('x-caf'),
       m4a: checkAudioMime('x-m4a') || checkAudioMime('m4a') || aacTest,
-      mp4: checkAudioMime('x-mp4') || checkAudioMime('mp4') || aacTest,
-      webm: !isOldSafari && checkAudioMime('webm;codecs="vorbis"'),
-      wav: checkAudioMime('wav;codecs="1"') || checkAudioMime('wav'),
+      m4b: checkAudioMime('x-m4b') || checkAudioMime('m4b') || aacTest,
+      mp4: checkAudioMime('x-mp4') || mp4Test,
+      weba: webmVorbisTest,
+      webm: webmVorbisTest,
+      dolby: checkAudioMime('mp4; codecs="ec-3"'),
       flac: checkAudioMime('x-flac') || checkAudioMime('flac'),
     })
-      .filter(([_, value]) => value)
+      .filter(([, value]) => value)
       .map(([key]) => key),
   )
-
-  // @ts-expect-error dispose
-  testAudio = null
-  return resultSet
 }
 
 export function bindEventListenerWithCleanup(
